@@ -1,0 +1,60 @@
+{
+  "common": {
+    "appName": "ParkShield",
+    "language": "Language",
+    "languageName": "English",
+    "switchTo": "Switch to {language}",
+    "skipToContent": "Skip to content",
+    "loading": "Loading …",
+    "close": "Close",
+    "back": "Back",
+    "continue": "Continue",
+    "save": "Save",
+    "cancel": "Cancel",
+    "required": "Required",
+    "optional": "optional",
+    "footer": {
+      "impressum": "Legal notice",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "withdrawal": "Withdrawal",
+      "accessibility": "Accessibility",
+      "cancelContract": "Cancel contract here"
+    }
+  },
+  "ops": {
+    "title": "ParkShield Ops",
+    "vpnOnly": "Reachable via VPN only. Every access is logged.",
+    "apiStatus": "Ops API status",
+    "apiUp": "Reachable",
+    "apiDown": "Unreachable"
+  },
+  "design": {
+    "title": "Design system",
+    "intro": "Base components with AA contrast, touch targets of at least 48 px and dark mode.",
+    "buttons": "Buttons",
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "danger": "Danger",
+    "ghost": "Subtle",
+    "badges": "Badges",
+    "notices": "Notices",
+    "noticeInfo": "Your alert has been sent.",
+    "noticeSuccess": "The driver has confirmed and is on the way.",
+    "noticeWarning": "Protection incomplete.",
+    "noticeDanger": "In real danger: call 110 or 112.",
+    "form": "Form",
+    "emailLabel": "E-mail address",
+    "emailHint": "We will send you a sign-in link.",
+    "messageLabel": "Custom message",
+    "messageCount": "{count, plural, one {# character} other {# characters}} of {max}",
+    "vehicles": "{count, plural, =0 {No vehicles} one {# vehicle} other {# vehicles}}",
+    "sampleAlert": "Vehicle is blocking an exit",
+    "statusSent": "Sent",
+    "statusConfirmed": "Confirmed",
+    "statusEscalated": "Escalated",
+    "statusExpired": "Expired",
+    "emailInvalid": "Please enter a valid e-mail address.",
+    "immediateStart": "I expressly request that the service starts immediately."
+  }
+}

@@ -1,0 +1,33 @@
+groups:
+  - name: availability
+    rules:
+      - alert: EndpointDown
+        expr: probe_success == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ '{{' }} $labels.instance {{ '}}' }} is down"
+      - alert: HostDown
+        expr: up{job="node"} == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Host {{ '{{' }} $labels.instance {{ '}}' }} is not reporting"
+
+  - name: backups
+    rules:
+      - alert: BackupStale
+        expr: time() - pgbackrest_last_backup_timestamp_seconds > 2 * 3600
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: No successful pgBackRest backup in the last 2 hours (RPO at risk)
+
+  - name: capacity
+    rules:
+      - alert: DiskAlmostFull
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) < 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Less than 15% disk left on {{ '{{' }} $labels.instance {{ '}}' }}"

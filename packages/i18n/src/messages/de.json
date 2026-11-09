@@ -1,0 +1,60 @@
+{
+  "common": {
+    "appName": "ParkShield",
+    "language": "Sprache",
+    "languageName": "Deutsch",
+    "switchTo": "Auf {language} umschalten",
+    "skipToContent": "Zum Inhalt springen",
+    "loading": "Wird geladen …",
+    "close": "Schließen",
+    "back": "Zurück",
+    "continue": "Weiter",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "required": "Pflichtfeld",
+    "optional": "optional",
+    "footer": {
+      "impressum": "Impressum",
+      "privacy": "Datenschutz",
+      "terms": "AGB",
+      "withdrawal": "Widerruf",
+      "accessibility": "Barrierefreiheit",
+      "cancelContract": "Verträge hier kündigen"
+    }
+  },
+  "ops": {
+    "title": "ParkShield Ops",
+    "vpnOnly": "Nur über VPN erreichbar. Jeder Zugriff wird protokolliert.",
+    "apiStatus": "Status der Ops-API",
+    "apiUp": "Erreichbar",
+    "apiDown": "Nicht erreichbar"
+  },
+  "design": {
+    "title": "Designsystem",
+    "intro": "Basiskomponenten mit AA-Kontrast, Touch-Zielen ab 48 px und Dark Mode.",
+    "buttons": "Schaltflächen",
+    "primary": "Primär",
+    "secondary": "Sekundär",
+    "danger": "Gefahr",
+    "ghost": "Dezent",
+    "badges": "Kennzeichnungen",
+    "notices": "Hinweise",
+    "noticeInfo": "Ihre Warnung wurde gesendet.",
+    "noticeSuccess": "Der Fahrer hat bestätigt und ist unterwegs.",
+    "noticeWarning": "Schutz unvollständig.",
+    "noticeDanger": "In echter Gefahr: 110 oder 112.",
+    "form": "Formular",
+    "emailLabel": "E-Mail-Adresse",
+    "emailHint": "Wir senden Ihnen einen Anmeldelink.",
+    "messageLabel": "Eigene Nachricht",
+    "messageCount": "{count, plural, one {# Zeichen} other {# Zeichen}} von {max}",
+    "vehicles": "{count, plural, =0 {Keine Fahrzeuge} one {# Fahrzeug} other {# Fahrzeuge}}",
+    "sampleAlert": "Fahrzeug versperrt Ausfahrt",
+    "statusSent": "Gesendet",
+    "statusConfirmed": "Bestätigt",
+    "statusEscalated": "Eskaliert",
+    "statusExpired": "Abgelaufen",
+    "emailInvalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "immediateStart": "Ich verlange ausdrücklich den sofortigen Beginn der Leistung."
+  }
+}

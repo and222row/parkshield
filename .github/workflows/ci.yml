@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_ENV: test
+  DATABASE_URL: postgres://parkshield:parkshield@127.0.0.1:5432/parkshield?sslmode=disable
+  TEST_DATABASE_URL: postgres://parkshield:parkshield@127.0.0.1:5432/parkshield_test?sslmode=disable
+  VALKEY_URL: redis://127.0.0.1:6379/0
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  verify:
+    name: Lint, typecheck, schema, unit + E2E tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: parkshield
+          POSTGRES_PASSWORD: parkshield
+          POSTGRES_DB: parkshield
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U parkshield" --health-interval 5s --health-timeout 5s --health-retries 10
+      valkey:
+        image: valkey/valkey:8
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "valkey-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Generate throwaway secrets for this run
+        run: npx tsx scripts/ensure-env.ts
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+      - name: Schema check on PostgreSQL 18 (up, run_retention(), rollback, up)
+        run: |
+          psql "$DATABASE_URL" -c 'CREATE DATABASE parkshield_test'
+          npm run db:check
+      - name: Migrate dev and test databases
+        run: |
+          npm run db:migrate
+          DATABASE_URL="$TEST_DATABASE_URL" npm run db:migrate
+      - name: Generated DB types are up to date
+        run: |
+          npm run db:types
+          git diff --exit-code apps/api/src/db/types.generated.ts
+
+      - run: npm test
+      - run: npm run build
+
+      - name: Start built apps
+        env:
+          NODE_ENV: production
+          APP_ENV: ci
+        run: |
+          (cd apps/api && node dist/main.js > ../../api.log 2>&1 &)
+          (cd apps/api && node dist/main-ops.js > ../../api-ops.log 2>&1 &)
+          (cd apps/api && node dist/worker.js > ../../worker.log 2>&1 &)
+          (npm run start -w @parkshield/web > web.log 2>&1 &)
+          (npm run start -w @parkshield/ops > ops.log 2>&1 &)
+          npx wait-on -t 90000 http-get://127.0.0.1:4000/v1/ready http-get://127.0.0.1:4001/ops/v1/health \
+            http-get://127.0.0.1:3000/ http-get://127.0.0.1:3001/
+      - name: E2E (Playwright)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - name: App logs
+        if: failure()
+        run: tail -n 100 *.log || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
+  security:
+    name: Dependency audit + SAST
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - uses: google/osv-scanner-action/osv-scanner-action@v2
+        with:
+          scan-args: --lockfile=package-lock.json
+      - name: Semgrep
+        run: pipx run semgrep scan --config p/typescript --config p/secrets --error --metrics=off
+
+  infra:
+    name: Terraform + Ansible checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform fmt -check -recursive
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate
+      - run: pipx run --spec ansible-lint ansible-lint infra/ansible
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: [verify, security, infra]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deploy secrets
+        id: secrets
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::warning::STAGING_SSH_KEY not configured; skipping staging deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy with Ansible over WireGuard
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          WIREGUARD_CONFIG: ${{ secrets.STAGING_WIREGUARD_CONFIG }}
+          SOPS_AGE_KEY: ${{ secrets.STAGING_SOPS_AGE_KEY }}
+        run: infra/scripts/deploy.sh staging "${GITHUB_SHA}"
