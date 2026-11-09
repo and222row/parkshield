@@ -64,6 +64,13 @@ export class BillingController {
     return this.billing.checkout(user, body);
   }
 
+  @Post('billing/portal')
+  @HttpCode(200)
+  @UseGuards(SessionGuard)
+  portal(@CurrentUser() user: AuthContext) {
+    return this.billing.portal(user.userId);
+  }
+
   @Get('billing/invoices')
   @UseGuards(SessionGuard)
   async invoices(@CurrentUser() user: AuthContext) {

@@ -6,6 +6,7 @@ import {
   Inject,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
   Res,
 } from '@nestjs/common';
@@ -13,7 +14,9 @@ import type { FastifyReply } from 'fastify';
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
 import { BillingService } from '../billing/billing.service';
-import { VALKEY } from '../core/tokens';
+import type { Db } from '../core/core.module';
+import { DB, VALKEY } from '../core/tokens';
+import { OrdersService } from '../orders/orders.service';
 import { ZodPipe } from '../core/zod.pipe';
 import type { FakePayments } from '../providers/fake-payments';
 import { DEV_MAILBOX_KEY } from '../providers/mailer';
@@ -21,6 +24,8 @@ import { simplePdf } from '../providers/pdf';
 import { PAYMENTS } from '../providers/ports';
 
 const Complete = z.object({ sessionId: z.string().startsWith('cs_fake_').max(64) });
+const Fail = z.object({ email: z.email(), final: z.boolean().default(false) });
+const Ship = z.object({ trackingNumber: z.string().max(64).optional() });
 
 /**
  * Local-only helpers for the fake providers: dev inbox, simulated Stripe checkout, fake invoices.
@@ -32,6 +37,8 @@ export class DevController {
     @Inject(VALKEY) private readonly valkey: Redis,
     @Inject(PAYMENTS) private readonly payments: FakePayments,
     @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(OrdersService) private readonly orders: OrdersService,
+    @Inject(DB) private readonly db: Db,
   ) {}
 
   @Get('mailbox')
@@ -64,6 +71,50 @@ export class DevController {
     if (!event) throw new NotFoundException();
     await this.billing.handle(event);
     return { redirectUrl: s.successUrl };
+  }
+
+  /** Simulates a failed renewal charge (Stripe invoice.payment_failed). */
+  @Post('payments/fail')
+  @HttpCode(200)
+  async fail(@Body(new ZodPipe(Fail)) body: z.infer<typeof Fail>) {
+    const sub = await this.db
+      .selectFrom('subscriptions as s')
+      .innerJoin('users as u', 'u.id', 's.user_id')
+      .select('s.stripe_subscription_id')
+      .where('u.email', '=', body.email.toLowerCase())
+      .where('s.status', 'in', ['active', 'past_due'])
+      .executeTakeFirst();
+    if (!sub?.stripe_subscription_id) throw new NotFoundException();
+    await this.billing.handle({
+      kind: 'payment_failed',
+      eventId: `evt_fake_fail_${Date.now()}`,
+      subscriptionId: sub.stripe_subscription_id,
+      attemptCount: body.final ? 4 : 1,
+      nextAttemptAt: body.final ? null : new Date(Date.now() + 3 * 86_400_000),
+    });
+    return { ok: true };
+  }
+
+  /** Simulates the print partner's shipping and delivery callbacks. */
+  @Post('print/:orderId/ship')
+  @HttpCode(200)
+  async ship(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body(new ZodPipe(Ship)) body: z.infer<typeof Ship>,
+  ) {
+    const ok = await this.orders.markShipped(
+      orderId,
+      body.trackingNumber ?? `00340434${Date.now()}`,
+    );
+    if (!ok) throw new NotFoundException();
+    return { ok };
+  }
+
+  @Post('print/:orderId/deliver')
+  @HttpCode(200)
+  async deliver(@Param('orderId', ParseUUIDPipe) orderId: string) {
+    if (!(await this.orders.markDelivered(orderId))) throw new NotFoundException();
+    return { ok: true };
   }
 
   @Get('payments/invoices/:file')

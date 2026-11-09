@@ -1,6 +1,30 @@
 export const MAILER = Symbol('MAILER');
 export const CAPTCHA = Symbol('CAPTCHA');
 export const PAYMENTS = Symbol('PAYMENTS');
+export const PRINT = Symbol('PRINT');
+
+export interface ShippingAddress {
+  name: string;
+  line1: string;
+  line2?: string;
+  postalCode: string;
+  city: string;
+  country: 'DE';
+}
+
+export interface PrintJob {
+  orderId: string;
+  product: 'uv_vinyl_sticker' | 'a6_dashboard_card' | 'nfc_vinyl_sticker';
+  quantity: number;
+  /** Print-ready PDF: CMYK, 3 mm bleed. */
+  pdf: Buffer;
+  address: ShippingAddress;
+}
+
+/** Print-and-ship partner (API or daily SFTP drop, chosen in Phase 0). */
+export interface PrintPartner {
+  submit(job: PrintJob): Promise<{ reference: string }>;
+}
 
 export interface OutgoingMail {
   to: string;
@@ -59,7 +83,13 @@ export type BillingEvent =
       periodEnd: Date | null;
       cancelAtPeriodEnd: boolean;
     }
-  | { kind: 'payment_failed'; eventId: string; subscriptionId: string }
+  | {
+      kind: 'payment_failed';
+      eventId: string;
+      subscriptionId: string;
+      attemptCount: number;
+      nextAttemptAt: Date | null;
+    }
   | { kind: 'ignored'; eventId: string; type: string };
 
 export interface Payments {
@@ -68,5 +98,7 @@ export interface Payments {
   /** Ends the subscription at `at`, or at the end of the current period when `at` is null. */
   cancelAt(subscriptionId: string, at: Date | null): Promise<{ periodEnd: Date | null }>;
   listInvoices(customerId: string): Promise<Invoice[]>;
+  /** Hosted page where the customer changes the payment method (OW-11). */
+  portalUrl(customerId: string, returnUrl: string): Promise<string>;
   parseWebhook(rawBody: Buffer, signature: string | undefined): Promise<BillingEvent>;
 }

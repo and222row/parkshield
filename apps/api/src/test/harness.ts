@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Redis } from 'ioredis';
 import { sql } from 'kysely';
@@ -22,12 +24,16 @@ export interface Harness {
 }
 
 /** Public app against parkshield_test + Valkey DB 1, with every provider faked. */
+export const PRINT_DIR = join(tmpdir(), `ps-print-${process.pid}`);
+
 export async function createHarness(): Promise<Harness> {
   const env = loadEnv({
     STRIPE_SECRET_KEY: '',
     BREVO_API_KEY: '',
     FRIENDLY_CAPTCHA_API_KEY: '',
     FRIENDLY_CAPTCHA_SITEKEY: '',
+    PRINT_PARTNER: '',
+    PRINT_OUTBOX_DIR: PRINT_DIR,
   });
   const app = await buildPublicApp(env, createLogger(env));
   await app.init();
@@ -95,6 +101,26 @@ export async function requestLink(h: Harness, email: string, ua = UA_WINDOWS_CHR
     headers: { 'user-agent': ua },
     payload: { email, locale: 'de', captcha: DEV_CAPTCHA_SOLUTION },
   });
+}
+
+/** Signs in and buys Plus through the fake checkout. */
+export async function subscribe(h: Harness, email: string, promoCode?: string): Promise<Session> {
+  const s = await signIn(h, email);
+  const res = await h.app.inject({
+    method: 'POST',
+    url: '/v1/billing/checkout',
+    headers: s.headers,
+    payload: { plan: 'plus', immediateStart: true, ...(promoCode ? { promoCode } : {}) },
+  });
+  if (res.statusCode !== 200) throw new Error(`checkout failed: ${res.body}`);
+  const sessionId = new URL(res.json().url).searchParams.get('session')!;
+  const done = await h.app.inject({
+    method: 'POST',
+    url: '/v1/dev/payments/complete',
+    payload: { sessionId },
+  });
+  if (done.statusCode !== 200) throw new Error(`payment failed: ${done.body}`);
+  return s;
 }
 
 export async function signIn(h: Harness, email: string, ua = UA_WINDOWS_CHROME): Promise<Session> {

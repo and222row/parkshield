@@ -4,6 +4,7 @@ import {
   type InvoiceSummary,
   type Me,
   type SubscriptionSummary,
+  type Vehicle,
 } from '@/lib/api-server';
 import { AccountView } from './account-view';
 
@@ -17,9 +18,10 @@ export default async function AccountPage({
 }) {
   const me = await serverApi<Me>('/v1/me');
   if (me.status === 401 || !me.data) redirect('/anmelden');
-  const [sub, invoices] = await Promise.all([
+  const [sub, invoices, vehicles] = await Promise.all([
     serverApi<{ subscription: SubscriptionSummary | null }>('/v1/billing/subscription'),
     serverApi<{ invoices: InvoiceSummary[] }>('/v1/billing/invoices'),
+    serverApi<{ vehicles: Vehicle[] }>('/v1/vehicles'),
   ]);
   const { checkout } = await searchParams;
   return (
@@ -27,6 +29,7 @@ export default async function AccountPage({
       me={me.data}
       subscription={sub.data?.subscription ?? null}
       invoices={invoices.data?.invoices ?? []}
+      vehicleCount={vehicles.data?.vehicles.length ?? 0}
       checkout={checkout === 'success' || checkout === 'canceled' ? checkout : undefined}
     />
   );

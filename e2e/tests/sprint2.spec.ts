@@ -24,7 +24,7 @@ test.describe('landing and legal pages (US-04)', () => {
     ['/agb', 'AGB', 'Allgemeine Geschäftsbedingungen'],
     ['/widerruf', 'Widerruf', 'Widerrufsbelehrung'],
     ['/barrierefreiheit', 'Barrierefreiheit', 'Erklärung zur Barrierefreiheit'],
-  ]) {
+  ] as const) {
     test(`${path} is linked in the footer and accessible`, async ({ page }) => {
       await page.goto('/');
       await page.locator('footer').getByRole('link', { name: footerLabel, exact: true }).click();

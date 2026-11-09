@@ -45,3 +45,26 @@ export const OWNER_REPLIES = ['coming', 'in_30_min', 'not_nearby'] as const;
 export type OwnerReply = (typeof OWNER_REPLIES)[number];
 
 export const CUSTOM_MESSAGE_MAX = 280;
+
+/** Decal header suggestions (OW-03). Decals are printed in German for the German market. */
+export const CTA_SUGGESTIONS = [
+  'Kontaktieren Sie mich',
+  'Blockiere ich Sie? Bitte scannen',
+  'Parke ich falsch? Kurz scannen',
+  'Licht an? Bitte scannen',
+  'Etwas passiert? Scannen',
+] as const;
+export const CTA_MAX = 40;
+
+export const DECAL_TEMPLATES = [
+  'classic',
+  'signal',
+  'bold',
+  'minimal',
+  'night',
+  'friendly',
+] as const;
+export type DecalTemplate = (typeof DECAL_TEMPLATES)[number];
+
+export const DECAL_PRODUCTS = ['uv_vinyl_sticker', 'a6_dashboard_card'] as const;
+export type DecalProduct = (typeof DECAL_PRODUCTS)[number];

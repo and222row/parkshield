@@ -59,6 +59,38 @@ const templates = {
       ],
       action: 'Anmeldung bestätigen',
     },
+    payment_failed: {
+      subject: 'Ihre Zahlung für ParkShield hat nicht geklappt',
+      lines: [
+        'Wir konnten die Verlängerung Ihres Abos nicht abbuchen. Ihr Schutz bleibt vorerst aktiv.',
+        'Wir versuchen es am {nextAttemptAt, date, long} erneut. Bitte prüfen Sie bis dahin Ihre Zahlungsmethode.',
+      ],
+      action: 'Zahlungsmethode prüfen',
+    },
+    payment_failed_final: {
+      subject: 'Ihr ParkShield-Schutz endet',
+      lines: [
+        'Auch der letzte Versuch, die Verlängerung abzubuchen, ist fehlgeschlagen. Ihr Abo endet, und Ihre Aufkleber werden inaktiv.',
+        'Sie können jederzeit in Ihrem Konto ein neues Abo abschließen.',
+      ],
+      action: 'Zum Konto',
+    },
+    order_received: {
+      subject: 'Ihr Aufkleber ist in Produktion',
+      lines: [
+        'Wir drucken Ihren ParkShield-Aufkleber für „{nickname}“. Der Versand dauert meist 3 bis 5 Werktage.',
+        'Bis er ankommt, können Sie das PDF zum Selbstausdrucken nutzen.',
+      ],
+      action: 'PDF herunterladen',
+    },
+    decal_shipped: {
+      subject: 'Ihr Aufkleber ist unterwegs',
+      lines: [
+        'Ihr ParkShield-Aufkleber für „{nickname}“ wurde versandt. Sendungsnummer: {trackingNumber}.',
+        'Bringen Sie ihn nach der Ankunft an und testen Sie ihn einmal: erst dann ist Ihr Schutz vollständig.',
+      ],
+      action: 'Zum Fahrzeug',
+    },
   },
   en: {
     magic_link: {
@@ -109,6 +141,38 @@ const templates = {
         'Please confirm. Without confirmation we delete the details after 30 days.',
       ],
       action: 'Confirm sign-up',
+    },
+    payment_failed: {
+      subject: 'Your ParkShield payment did not go through',
+      lines: [
+        'We could not collect the renewal of your subscription. Your protection stays active for now.',
+        'We will try again on {nextAttemptAt, date, long}. Please check your payment method before then.',
+      ],
+      action: 'Check payment method',
+    },
+    payment_failed_final: {
+      subject: 'Your ParkShield protection is ending',
+      lines: [
+        'The last attempt to collect your renewal also failed. Your subscription ends and your decals become inactive.',
+        'You can start a new subscription in your account at any time.',
+      ],
+      action: 'Open my account',
+    },
+    order_received: {
+      subject: 'Your decal is being printed',
+      lines: [
+        'We are printing your ParkShield decal for “{nickname}”. Delivery usually takes 3 to 5 working days.',
+        'Until it arrives, you can use the print-at-home PDF.',
+      ],
+      action: 'Download PDF',
+    },
+    decal_shipped: {
+      subject: 'Your decal is on its way',
+      lines: [
+        'Your ParkShield decal for “{nickname}” has been shipped. Tracking number: {trackingNumber}.',
+        'Once it arrives, apply it and test it once: only then is your protection complete.',
+      ],
+      action: 'Open vehicle',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

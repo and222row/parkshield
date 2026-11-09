@@ -6,6 +6,7 @@ import {
   mailbox,
   resetState,
   signIn,
+  subscribe as subscribeWith,
   type Harness,
   type Session,
 } from '../test/harness';
@@ -21,24 +22,7 @@ async function checkout(s: Session, payload: Record<string, unknown>) {
   return h.app.inject({ method: 'POST', url: '/v1/billing/checkout', headers: s.headers, payload });
 }
 
-/** Signs in, buys Plus through the fake checkout and returns the session. */
-async function subscribe(email: string, promoCode?: string): Promise<Session> {
-  const s = await signIn(h, email);
-  const res = await checkout(s, {
-    plan: 'plus',
-    immediateStart: true,
-    ...(promoCode ? { promoCode } : {}),
-  });
-  expect(res.statusCode, res.body).toBe(200);
-  const sessionId = new URL(res.json().url).searchParams.get('session')!;
-  const done = await h.app.inject({
-    method: 'POST',
-    url: '/v1/dev/payments/complete',
-    payload: { sessionId },
-  });
-  expect(done.statusCode, done.body).toBe(200);
-  return s;
-}
+const subscribe = (email: string, promoCode?: string) => subscribeWith(h, email, promoCode);
 
 describe('plans (US-04)', () => {
   it('lists Plus €10 purchasable, Premium €15 shown but not yet purchasable, Business coming soon', async () => {

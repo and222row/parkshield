@@ -234,13 +234,7 @@ export class BillingService {
     try {
       if (event.kind === 'checkout_completed') await this.onCheckoutCompleted(event);
       if (event.kind === 'subscription_updated') await this.onSubscriptionUpdated(event);
-      if (event.kind === 'payment_failed') {
-        await this.db
-          .updateTable('subscriptions')
-          .set({ status: 'past_due' })
-          .where('stripe_subscription_id', '=', event.subscriptionId)
-          .execute();
-      }
+      if (event.kind === 'payment_failed') await this.onPaymentFailed(event);
     } catch (err) {
       await this.valkey.del(`billing:event:${event.eventId}`);
       throw err;
@@ -431,5 +425,63 @@ export class BillingService {
       .where('id', '=', userId)
       .executeTakeFirstOrThrow();
     return row.stripe_customer_id ? this.payments.listInvoices(row.stripe_customer_id) : [];
+  }
+
+  /** US-08: renewal failed. Stripe retries (Smart Retries, 3 attempts); the customer gets a reminder each time. */
+  private async onPaymentFailed(e: Extract<BillingEvent, { kind: 'payment_failed' }>) {
+    const sub = await this.db
+      .updateTable('subscriptions')
+      .set({ status: 'past_due' })
+      .where('stripe_subscription_id', '=', e.subscriptionId)
+      .where('status', 'in', LIVE)
+      .returning('user_id')
+      .executeTakeFirst();
+    if (!sub?.user_id) return;
+    const user = await this.db
+      .selectFrom('users')
+      .select(['email', 'preferred_lang'])
+      .where('id', '=', sub.user_id)
+      .executeTakeFirstOrThrow();
+    await this.mail.send({
+      to: user.email,
+      template: e.nextAttemptAt ? 'payment_failed' : 'payment_failed_final',
+      locale: user.preferred_lang,
+      values: e.nextAttemptAt ? { nextAttemptAt: e.nextAttemptAt } : {},
+      actionUrl: `${this.env.WEB_BASE_URL}/konto`,
+    });
+  }
+
+  /**
+   * Safety net for missed provider events: subscriptions whose paid period ended become `expired`, which
+   * makes their decals inactive (US-08). Cancelled ones after one day, any others after a 21-day grace.
+   */
+  async expireEnded(): Promise<number> {
+    const r = await this.db
+      .updateTable('subscriptions')
+      .set({ status: 'expired' })
+      .where('status', 'in', LIVE)
+      .where((eb) =>
+        eb.or([
+          eb.and([
+            eb('cancel_at_period_end', '=', true),
+            eb('current_period_end', '<', sql<Date>`now() - interval '1 day'`),
+          ]),
+          eb('current_period_end', '<', sql<Date>`now() - interval '21 days'`),
+        ]),
+      )
+      .executeTakeFirst();
+    return Number(r.numUpdatedRows);
+  }
+
+  async portal(userId: string): Promise<{ url: string }> {
+    const row = await this.db
+      .selectFrom('users')
+      .select('stripe_customer_id')
+      .where('id', '=', userId)
+      .executeTakeFirstOrThrow();
+    if (!row.stripe_customer_id) throw new NotFoundException({ error: 'no_customer' });
+    return {
+      url: await this.payments.portalUrl(row.stripe_customer_id, `${this.env.WEB_BASE_URL}/konto`),
+    };
   }
 }

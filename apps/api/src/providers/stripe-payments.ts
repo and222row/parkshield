@@ -28,8 +28,17 @@ export class StripePayments implements Payments {
     secretKey: string,
     private readonly webhookSecret: string,
     private readonly prices: Record<PaidPlan, string>,
+    client?: Stripe,
   ) {
-    this.stripe = new Stripe(secretKey);
+    this.stripe = client ?? new Stripe(secretKey);
+  }
+
+  async portalUrl(customerId: string, returnUrl: string): Promise<string> {
+    const s = await this.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+    return s.url;
   }
 
   async ensureCustomer(input: {
@@ -103,30 +112,59 @@ export class StripePayments implements Payments {
         periodEnd: p.end ?? new Date(),
       };
     }
-    if (
-      event.type === 'customer.subscription.updated' ||
-      event.type === 'customer.subscription.deleted'
-    ) {
+    if (event.type === 'customer.subscription.deleted') {
       const p = period(obj);
       return {
         kind: 'subscription_updated',
         eventId: event.id,
         subscriptionId: String(obj.id),
-        status:
-          event.type === 'customer.subscription.deleted'
-            ? 'canceled'
-            : mapStatus(String(obj.status)),
+        status: 'canceled',
         periodStart: p.start,
         periodEnd: p.end,
-        cancelAtPeriodEnd: Boolean(obj.cancel_at_period_end),
+        cancelAtPeriodEnd: true,
       };
     }
+    if (event.type === 'customer.subscription.updated' || event.type === 'invoice.paid') {
+      // Webhooks can arrive out of order: read the current state instead of trusting the payload.
+      const id = event.type === 'invoice.paid' ? invoiceSubscription(obj) : String(obj.id);
+      if (!id) return { kind: 'ignored', eventId: event.id, type: event.type };
+      return { ...(await this.currentState(id)), eventId: event.id };
+    }
     if (event.type === 'invoice.payment_failed') {
-      const parent = obj.parent as { subscription_details?: { subscription?: string } } | undefined;
-      const subscriptionId =
-        (obj.subscription as string | undefined) ?? parent?.subscription_details?.subscription;
-      if (subscriptionId) return { kind: 'payment_failed', eventId: event.id, subscriptionId };
+      const subscriptionId = invoiceSubscription(obj);
+      if (subscriptionId) {
+        return {
+          kind: 'payment_failed',
+          eventId: event.id,
+          subscriptionId,
+          attemptCount: Number(obj.attempt_count ?? 1),
+          nextAttemptAt: toDate(obj.next_payment_attempt as number | null | undefined),
+        };
+      }
     }
     return { kind: 'ignored', eventId: event.id, type: event.type };
   }
+
+  private async currentState(
+    subscriptionId: string,
+  ): Promise<Omit<Extract<BillingEvent, { kind: 'subscription_updated' }>, 'eventId'>> {
+    const sub = (await this.stripe.subscriptions.retrieve(subscriptionId)) as unknown as Record<
+      string,
+      unknown
+    >;
+    const p = period(sub);
+    return {
+      kind: 'subscription_updated',
+      subscriptionId,
+      status: mapStatus(String(sub.status)),
+      periodStart: p.start,
+      periodEnd: p.end,
+      cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end) || Boolean(sub.cancel_at),
+    };
+  }
+}
+
+function invoiceSubscription(invoice: Record<string, unknown>): string | undefined {
+  const parent = invoice.parent as { subscription_details?: { subscription?: string } } | undefined;
+  return (invoice.subscription as string | undefined) ?? parent?.subscription_details?.subscription;
 }

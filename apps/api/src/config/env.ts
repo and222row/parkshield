@@ -32,6 +32,8 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().default('ParkShield <hallo@parkshield.de>'),
   FRIENDLY_CAPTCHA_SITEKEY: z.string().default(''),
   FRIENDLY_CAPTCHA_API_KEY: z.string().default(''),
+  PRINT_PARTNER: z.string().default(''),
+  PRINT_OUTBOX_DIR: z.string().default(''),
 });
 
 /** Providers without keys fall back to local fakes, which are never allowed in production. */
@@ -40,6 +42,8 @@ export function fakeProviders(env: Env) {
     mail: !env.BREVO_API_KEY,
     captcha: !env.FRIENDLY_CAPTCHA_API_KEY || !env.FRIENDLY_CAPTCHA_SITEKEY,
     payments: !env.STRIPE_SECRET_KEY,
+    // No real print partner adapter yet: it is built once the partner is chosen in Phase 0.
+    print: !env.PRINT_PARTNER,
   };
 }
 export type Env = z.infer<typeof envSchema>;
@@ -52,6 +56,8 @@ function findRepoRoot(start: string): string | undefined {
   }
   return undefined;
 }
+
+export const repoRoot = (): string => findRepoRoot(process.cwd()) ?? process.cwd();
 
 /** Loads the repo-root .env in local dev (production injects real environment variables) and validates. */
 export function loadEnv(overrides: Partial<Record<keyof Env, string>> = {}): Env {

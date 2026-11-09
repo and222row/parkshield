@@ -1,12 +1,14 @@
+import { join } from 'node:path';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
-import { fakeProviders, type Env } from '../config/env';
+import { fakeProviders, repoRoot, type Env } from '../config/env';
 import { LOGGER, VALKEY } from '../core/tokens';
 import { DevCaptcha, FriendlyCaptcha } from './captcha';
 import { FakePayments } from './fake-payments';
+import { FakePrintPartner } from './fake-print';
 import { BrevoMailer, DevMailer } from './mailer';
-import { CAPTCHA, MAILER, PAYMENTS } from './ports';
+import { CAPTCHA, MAILER, PAYMENTS, PRINT } from './ports';
 import { StripePayments } from './stripe-payments';
 
 @Global()
@@ -43,8 +45,17 @@ export class ProvidersModule {
                   premium: env.STRIPE_PRICE_PREMIUM_YEARLY,
                 }),
         },
+        {
+          provide: PRINT,
+          useFactory: () => {
+            if (!fakes.print) throw new Error(`Unknown PRINT_PARTNER "${env.PRINT_PARTNER}"`);
+            return new FakePrintPartner(
+              env.PRINT_OUTBOX_DIR || join(repoRoot(), '.local', 'print-outbox'),
+            );
+          },
+        },
       ],
-      exports: [MAILER, CAPTCHA, PAYMENTS],
+      exports: [MAILER, CAPTCHA, PAYMENTS, PRINT],
     };
   }
 }

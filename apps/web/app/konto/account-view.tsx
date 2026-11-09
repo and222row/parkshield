@@ -29,11 +29,13 @@ export function AccountView({
   me,
   subscription,
   invoices,
+  vehicleCount,
   checkout,
 }: {
   me: Me;
   subscription: SubscriptionSummary | null;
   invoices: InvoiceSummary[];
+  vehicleCount: number;
   checkout?: 'success' | 'canceled';
 }) {
   const { t, locale } = useI18n();
@@ -64,6 +66,11 @@ export function AccountView({
     router.refresh();
   }
 
+  async function paymentMethod() {
+    const { url } = await api<{ url: string }>('/v1/billing/portal', { body: {} });
+    window.location.assign(url);
+  }
+
   return (
     <PageShell>
       <Container className="py-10">
@@ -90,9 +97,34 @@ export function AccountView({
               <Heading level={2} className="text-xl">
                 {t('account.subscription')}
               </Heading>
+              {subscription?.status === 'past_due' && (
+                <Notice tone="warning">{t('account.pastDueNotice')}</Notice>
+              )}
               {subscription ? <SubscriptionInfo sub={subscription} /> : <CheckoutForm />}
+              {subscription && (
+                <Button variant="secondary" onClick={paymentMethod} className="w-fit">
+                  {t('account.paymentMethod')}
+                </Button>
+              )}
             </Stack>
           </Card>
+
+          {subscription && (
+            <Card className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Heading level={2} className="text-xl">
+                  {t('vehicles.title')}
+                </Heading>
+                <Text muted>{t('vehicles.summary', { count: vehicleCount })}</Text>
+              </div>
+              <Link
+                href="/konto/fahrzeuge"
+                className="inline-flex min-h-12 items-center rounded-xl bg-primary px-5 font-semibold text-primary-fg hover:bg-primary-hover"
+              >
+                {t('vehicles.manage')}
+              </Link>
+            </Card>
+          )}
 
           <Card>
             <Stack gap={3}>

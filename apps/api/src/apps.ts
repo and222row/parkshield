@@ -19,9 +19,25 @@ import { HealthService } from './health/health.service';
 import { MailService } from './mail/mail.service';
 import { OpsHealthController } from './ops/ops-health.controller';
 import { ProvidersModule } from './providers/providers.module';
+import { EntitlementService } from './billing/entitlements.service';
+import { OrdersController } from './orders/orders.controller';
+import { OrdersService } from './orders/orders.service';
+import { TokensService } from './vehicles/tokens.service';
+import { VehiclesController } from './vehicles/vehicles.controller';
+import { VehiclesService } from './vehicles/vehicles.service';
 import { WaitlistController } from './waitlist/waitlist.controller';
+import { OutboxService } from './worker/outbox.service';
+import { SchedulerService } from './worker/scheduler.service';
+import { WorkerBootstrap } from './worker/worker.bootstrap';
 
 const sharedProviders = [HealthService, RateLimitService, SettingsService, MailService];
+const domainProviders = [
+  BillingService,
+  EntitlementService,
+  TokensService,
+  VehiclesService,
+  OrdersService,
+];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
 @Module({})
@@ -38,15 +54,17 @@ export class PublicAppModule {
         BillingController,
         StripeWebhookController,
         WaitlistController,
+        VehiclesController,
+        OrdersController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [
         ...sharedProviders,
+        ...domainProviders,
         SessionService,
         SessionGuard,
         AuthService,
         PasskeyService,
-        BillingService,
         { provide: APP_GUARD, useClass: CsrfGuard },
       ],
     };
@@ -72,7 +90,13 @@ export class WorkerModule {
     return {
       module: WorkerModule,
       imports: [CoreModule.forRoot(env, logger), ProvidersModule.forRoot(env)],
-      providers: [...sharedProviders],
+      providers: [
+        ...sharedProviders,
+        ...domainProviders,
+        OutboxService,
+        SchedulerService,
+        WorkerBootstrap,
+      ],
     };
   }
 }

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { DecalTemplate } from '@parkshield/shared';
 import { cookies } from 'next/headers';
 
 const API = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
@@ -30,6 +31,45 @@ export interface SubscriptionSummary {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   canceledAt: string | null;
+}
+
+export type TokenStatus = 'generated' | 'printed' | 'shipped' | 'active' | 'revoked';
+
+export interface Vehicle {
+  id: string;
+  nickname: string;
+  plate: string | null;
+  makeModel: string | null;
+  color: string | null;
+  createdAt: string;
+  decal: {
+    tokenId: string;
+    codeHint: string;
+    status: TokenStatus;
+    cta: string;
+    template: DecalTemplate;
+    activatedAt: string | null;
+    lastTestAt: string | null;
+  } | null;
+}
+
+export interface OrderSummary {
+  id: string;
+  status:
+    | 'pending_payment'
+    | 'paid'
+    | 'in_production'
+    | 'shipped'
+    | 'delivered'
+    | 'returned'
+    | 'canceled'
+    | 'refunded';
+  included: boolean;
+  trackingNumber: string | null;
+  createdAt: string;
+  product: string;
+  vehicleId: string | null;
+  nickname: string | null;
 }
 
 export interface InvoiceSummary {

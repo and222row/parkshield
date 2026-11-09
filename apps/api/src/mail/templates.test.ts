@@ -11,6 +11,9 @@ const values = {
   plan: 'Plus',
   contractNo: 'PS-7K3Q9X2M',
   company: 'Malermeister <Schulz> GmbH',
+  nextAttemptAt: new Date('2028-08-06T00:00:00Z'),
+  nickname: 'Der Blaue',
+  trackingNumber: '00340434161234567890',
 };
 
 describe('mail templates', () => {

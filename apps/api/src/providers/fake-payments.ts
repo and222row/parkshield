@@ -61,6 +61,10 @@ export class FakePayments implements Payments {
     };
   }
 
+  async portalUrl(_customerId: string, returnUrl: string): Promise<string> {
+    return `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}portal=dev`;
+  }
+
   async cancelAt(): Promise<{ periodEnd: Date | null }> {
     return { periodEnd: null };
   }

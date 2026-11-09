@@ -11,7 +11,8 @@ import pg from 'pg';
 import type { Logger } from 'pino';
 import type { Env } from '../config/env';
 import type { DB as Database } from '../db/types.generated';
-import { DB, ENV, LOGGER, VALKEY } from './tokens';
+import { FieldCrypto } from './crypto';
+import { CRYPTO, DB, ENV, LOGGER, VALKEY } from './tokens';
 
 export type Db = Kysely<Database>;
 
@@ -29,6 +30,7 @@ export class CoreModule implements OnApplicationShutdown {
       providers: [
         { provide: ENV, useValue: env },
         { provide: LOGGER, useValue: logger },
+        { provide: CRYPTO, useFactory: () => FieldCrypto.fromEnv(process.env, env.BIDX_KEY) },
         {
           provide: DB,
           useFactory: () =>
@@ -43,7 +45,7 @@ export class CoreModule implements OnApplicationShutdown {
           useFactory: () => new Redis(env.VALKEY_URL, { maxRetriesPerRequest: null }),
         },
       ],
-      exports: [ENV, LOGGER, DB, VALKEY],
+      exports: [ENV, LOGGER, DB, VALKEY, CRYPTO],
     };
   }
 
