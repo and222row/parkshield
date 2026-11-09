@@ -8,7 +8,9 @@ import { DevCaptcha, FriendlyCaptcha } from './captcha';
 import { FakePayments } from './fake-payments';
 import { FakePrintPartner } from './fake-print';
 import { BrevoMailer, DevMailer } from './mailer';
-import { CAPTCHA, MAILER, PAYMENTS, PRINT } from './ports';
+import { CAPTCHA, MAILER, PAYMENTS, PRINT, PUSH, WHATSAPP } from './ports';
+import { VapidPushSender } from './push';
+import { Dialog360Sender, DevWhatsAppSender } from './whatsapp';
 import { StripePayments } from './stripe-payments';
 
 @Global()
@@ -54,8 +56,26 @@ export class ProvidersModule {
             );
           },
         },
+        {
+          provide: PUSH,
+          useFactory: () =>
+            new VapidPushSender(
+              env.VAPID_SUBJECT,
+              env.VAPID_PUBLIC_KEY,
+              env.VAPID_PRIVATE_KEY,
+              env.NODE_ENV !== 'production',
+            ),
+        },
+        {
+          provide: WHATSAPP,
+          inject: [VALKEY, LOGGER],
+          useFactory: (valkey: Redis, logger: Logger) =>
+            fakes.whatsapp
+              ? new DevWhatsAppSender(valkey, logger)
+              : new Dialog360Sender(env.D360_API_KEY, env.D360_BASE_URL),
+        },
       ],
-      exports: [MAILER, CAPTCHA, PAYMENTS, PRINT],
+      exports: [MAILER, CAPTCHA, PAYMENTS, PRINT, PUSH, WHATSAPP],
     };
   }
 }

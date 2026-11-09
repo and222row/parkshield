@@ -108,6 +108,22 @@ const templates = {
       ],
       action: 'Zum Fahrzeug',
     },
+    push_removed: {
+      subject: 'Push-Benachrichtigungen auf {device} ausgeschaltet',
+      lines: [
+        'Wir konnten Push-Benachrichtigungen an {device} nicht mehr zustellen und haben das Gerät deshalb entfernt.',
+        'Warnungen erreichen Sie weiter per E-Mail. Öffnen Sie Ihr Konto auf dem Gerät, um Push wieder einzuschalten.',
+      ],
+      action: 'Push wieder einschalten',
+    },
+    alert_followup: {
+      subject: 'Erinnerung: Jemand wartet an „{nickname}“',
+      lines: [
+        'Die Person, die Sie wegen „{nickname}“ gewarnt hat ({type}), wartet noch auf Sie.',
+        'Bitte kommen Sie zum Fahrzeug oder antworten Sie kurz, damit sie Bescheid weiß.',
+      ],
+      action: 'Antworten',
+    },
   },
   en: {
     magic_link: {
@@ -207,6 +223,22 @@ const templates = {
         'Once it arrives, apply it and test it once: only then is your protection complete.',
       ],
       action: 'Open vehicle',
+    },
+    push_removed: {
+      subject: 'Push notifications turned off on {device}',
+      lines: [
+        'We could no longer deliver push notifications to {device}, so we removed the device.',
+        'Alerts still reach you by e-mail. Open your account on that device to turn push back on.',
+      ],
+      action: 'Turn push back on',
+    },
+    alert_followup: {
+      subject: 'Reminder: someone is waiting at “{nickname}”',
+      lines: [
+        'The person who alerted you about “{nickname}” ({type}) is still waiting for you.',
+        'Please go to your vehicle or send a short reply so they know.',
+      ],
+      action: 'Reply',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

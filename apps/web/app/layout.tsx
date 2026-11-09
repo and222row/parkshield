@@ -7,6 +7,13 @@ import './globals.css';
 export const metadata: Metadata = {
   title: { default: 'ParkShield', template: '%s · ParkShield' },
   description: 'Ihre Handynummer gehört nicht hinter die Windschutzscheibe.',
+  // PWA: on iOS, Web Push works only for sites added to the home screen (US-20).
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [{ url: '/icons/favicon-32.png', sizes: '32x32', type: 'image/png' }],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
+  appleWebApp: { capable: true, title: 'ParkShield', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {

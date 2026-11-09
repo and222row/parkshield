@@ -26,7 +26,11 @@ const config: NextConfig = {
     return [{ source: '/v1/:path*', destination: `${api}/v1/:path*` }];
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Browsers must pick up a new service worker at once (it only shows push notifications).
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+    ];
   },
 };
 

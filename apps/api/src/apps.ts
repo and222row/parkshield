@@ -10,6 +10,7 @@ import { BillingController, StripeWebhookController } from './billing/billing.co
 import { BillingService } from './billing/billing.service';
 import { fakeProviders, type Env } from './config/env';
 import { CoreModule } from './core/core.module';
+import { GeoService } from './core/geo.service';
 import { createHttpApp } from './core/http';
 import { RateLimitService } from './core/rate-limit.service';
 import { SettingsService } from './core/settings.service';
@@ -25,7 +26,10 @@ import { OrdersService } from './orders/orders.service';
 import { TokensService } from './vehicles/tokens.service';
 import { VehiclesController } from './vehicles/vehicles.controller';
 import { VehiclesService } from './vehicles/vehicles.service';
+import { ChannelsController, WhatsAppWebhookController } from './channels/channels.controller';
+import { ChannelsService } from './channels/channels.service';
 import { DispatchService } from './notifications/dispatch.service';
+import { WhatsAppWebhookService } from './notifications/whatsapp-webhook.service';
 import { ScanController } from './scan/scan.controller';
 import { ScanService } from './scan/scan.service';
 import { ScannerRefService } from './scan/scanner-ref.service';
@@ -34,7 +38,7 @@ import { OutboxService } from './worker/outbox.service';
 import { SchedulerService } from './worker/scheduler.service';
 import { WorkerBootstrap } from './worker/worker.bootstrap';
 
-const sharedProviders = [HealthService, RateLimitService, SettingsService, MailService];
+const sharedProviders = [HealthService, RateLimitService, SettingsService, MailService, GeoService];
 const domainProviders = [
   BillingService,
   EntitlementService,
@@ -44,6 +48,8 @@ const domainProviders = [
   ScannerRefService,
   ScanService,
   DispatchService,
+  ChannelsService,
+  WhatsAppWebhookService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -64,6 +70,8 @@ export class PublicAppModule {
         VehiclesController,
         OrdersController,
         ScanController,
+        ChannelsController,
+        WhatsAppWebhookController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [

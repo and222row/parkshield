@@ -100,14 +100,16 @@ export type UserStatus = "active" | "pending_deletion" | "suspended";
 export type VehicleModeKind = "sensitive_spot" | "short_stop";
 
 export interface AbuseReports {
-  alert_id: string;
+  alert_id: string | null;
   created_at: Generated<Timestamp>;
   handled_at: Timestamp | null;
   handled_by: string | null;
   id: Generated<string>;
+  kind: Generated<string>;
   note: string | null;
+  qr_token_id: string | null;
   reason: string;
-  reported_by: string;
+  reported_by: string | null;
   status: Generated<AbuseStatus>;
 }
 

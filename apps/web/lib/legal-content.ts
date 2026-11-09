@@ -53,7 +53,8 @@ const de: Record<LegalSlug, LegalDoc> = {
           'Sie brauchen kein Konto und keine App. Wir setzen auf der Scan-Seite keine Cookies und lesen nichts von Ihrem Gerät aus (§ 25 TDDDG). Ihr Sitzungsschlüssel für den Live-Status liegt nur im Sitzungsspeicher Ihres Browsers.',
           'Ihre IP-Adresse kürzen wir sofort (IPv4 auf /24, IPv6 auf /48) und speichern sie nie vollständig, auch nicht in Server-Logs.',
           'Zum Schutz vor Missbrauch bilden wir aus gekürzter IP-Adresse und Browserkennung eine pseudonyme Kennung, die sich täglich ändert und nach 24 Stunden gelöscht wird. Meldet die Fahrzeughalterin oder der Fahrzeughalter Ihre Nachricht als Missbrauch, nutzen wir eine zweite, nur für dieses Fahrzeug gültige Kennung, um Sie 30 Tage für dieses Fahrzeug zu sperren. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (Schutz vor Missbrauch).',
-          'Aus der IP-Adresse leiten wir nur das Land ab, um Ihnen die richtigen Notrufnummern zu zeigen; es wird nach 24 Stunden gelöscht.',
+          'Aus der IP-Adresse leiten wir nur das Land ab, um Ihnen die richtigen Notrufnummern zu zeigen; es wird nach 24 Stunden gelöscht. Die Zuordnung erfolgt auf unseren eigenen Servern mit der Datenbank „IP to Country Lite“ von DB-IP (db-ip.com, Lizenz CC BY 4.0); die IP-Adresse wird dafür an niemanden übermittelt.',
+          'Melden Sie einen verdächtigen Aufkleber, speichern wir den betroffenen Code und Ihren freiwilligen Hinweis 90 Tage, um Fälschungen zu prüfen (Art. 6 Abs. 1 lit. f DSGVO).',
           'Die Fahrzeughalterin oder der Fahrzeughalter sieht nur Zeitpunkt, Art der Warnung und gegebenenfalls Ihren Text. Freitexte löschen wir nach 7 Tagen.',
         ],
       },
@@ -61,6 +62,7 @@ const de: Record<LegalSlug, LegalDoc> = {
         heading: '3. Kundenkonto und Abo',
         paragraphs: [
           'Für Ihr Konto verarbeiten wir E-Mail-Adresse, Kanäle, Fahrzeuge (Kennzeichen verschlüsselt) und Warnungen zur Erfüllung des Vertrags (Art. 6 Abs. 1 lit. b DSGVO). Für die Anmeldung setzen wir zwei technisch notwendige Cookies (Sitzung und Schutz vor Cross-Site-Request-Forgery).',
+          'Schalten Sie Push-Benachrichtigungen ein, speichern wir die vom Browser erzeugte Zustelladresse und den Gerätetyp. Die Nachrichten laufen Ende-zu-Ende-verschlüsselt über den Push-Dienst Ihres Browsers (Google, Apple, Mozilla oder Microsoft), der den Inhalt nicht lesen kann. Ein Gerät, das nicht mehr erreichbar ist, entfernen wir automatisch.',
           'WhatsApp und SMS nutzen wir nur mit Ihrer Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Notfallkontakte und Mitfahrende werden erst nach deren eigener Bestätigung genutzt; ohne Antwort löschen wir die Einladung nach 14 Tagen.',
           'Rechnungen bewahren wir aufgrund gesetzlicher Pflichten auf (Art. 6 Abs. 1 lit. c DSGVO, § 147 AO, § 14b UStG).',
           'E-Mail-Adressen, die einen Anmeldelink angefordert, aber nie bestätigt haben, löschen wir nach 24 Stunden.',
@@ -215,13 +217,13 @@ const en: Record<LegalSlug, LegalDoc> = {
       {
         heading: 'When you scan a decal',
         paragraphs: [
-          'No account, no app, no cookies, nothing read from your device. Your IP address is truncated immediately and never stored in full. A pseudonymous reference that changes daily (deleted after 24 h) protects against abuse; if the owner reports a message, a second reference valid for that one vehicle blocks you there for 30 days. Your country is used only to show the right emergency numbers and is deleted after 24 h. Free text is deleted after 7 days.',
+          'No account, no app, no cookies, nothing read from your device. Your IP address is truncated immediately and never stored in full. A pseudonymous reference that changes daily (deleted after 24 h) protects against abuse; if the owner reports a message, a second reference valid for that one vehicle blocks you there for 30 days. Your country is used only to show the right emergency numbers and is deleted after 24 h; it is looked up on our own servers with DB-IP’s “IP to Country Lite” database (db-ip.com, licensed CC BY 4.0). Free text is deleted after 7 days. Reports of suspicious decals are kept for 90 days.',
         ],
       },
       {
         heading: 'Your account',
         paragraphs: [
-          'We process your e-mail address, channels, vehicles (licence plate encrypted) and alerts to provide the service. WhatsApp and SMS only with your consent. Two strictly necessary cookies keep you signed in securely. Unverified sign-ups are deleted after 24 h; deleted data leaves our encrypted backups within 35 days.',
+          'We process your e-mail address, channels, vehicles (licence plate encrypted) and alerts to provide the service. Push notifications travel end-to-end encrypted through your browser’s push service; unreachable devices are removed automatically. WhatsApp and SMS only with your consent. Two strictly necessary cookies keep you signed in securely. Unverified sign-ups are deleted after 24 h; deleted data leaves our encrypted backups within 35 days.',
         ],
       },
       {

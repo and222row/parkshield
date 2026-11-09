@@ -4,6 +4,8 @@ import { sql } from 'kysely';
 import type { Db } from '../core/core.module';
 import type { FieldCrypto } from '../core/crypto';
 import { randomToken, sha256 } from '../core/crypto';
+import { GeoService } from '../core/geo.service';
+import { RateLimitService } from '../core/rate-limit.service';
 import { SettingsService } from '../core/settings.service';
 import { CRYPTO, DB } from '../core/tokens';
 import { filterText } from '../moderation/text-filter';
@@ -18,9 +20,13 @@ export function normalizeCode(raw: string): string | null {
   return CROCKFORD_CODE.test(code) ? code : null;
 }
 
+export const FOLLOWUP_TOPIC = 'alert.followup';
+
 export interface ScanContext {
   ipPrefix: string;
   userAgent: string;
+  /** Full address, used once for the country lookup and never stored. */
+  ip?: string;
 }
 
 @Injectable()
@@ -30,6 +36,8 @@ export class ScanService {
     @Inject(CRYPTO) private readonly crypto: FieldCrypto,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(ScannerRefService) private readonly refs: ScannerRefService,
+    @Inject(RateLimitService) private readonly limits: RateLimitService,
+    @Inject(GeoService) private readonly geo: GeoService,
   ) {}
 
   /**
@@ -134,6 +142,7 @@ export class ScanService {
       scanner_ref: refs.scannerRef,
       block_ref: refs.blockRef,
       is_test: isTest,
+      scanner_country: this.geo.country(ctx.ip),
       custom_message_enc: message ? this.crypto.encrypt(message) : null,
       key_version: this.crypto.keyVersion,
     };
@@ -164,6 +173,17 @@ export class ScanService {
           reason: verdict.reason,
         });
       }
+    }
+
+    // US-17: per scanner per vehicle, per scanner across vehicles, per vehicle from everyone.
+    // Checked after the text filter so a rejected message does not cost the scanner their attempt.
+    if (!isTest) {
+      const ref = refs.scannerRef.toString('hex');
+      await this.limits.enforceAll([
+        { name: 'alert.scanner_vehicle', subject: `${token.tokenId}:${ref}` },
+        { name: 'alert.scanner_global', subject: ref },
+        { name: 'alert.vehicle', subject: token.tokenId },
+      ]);
     }
 
     const statusToken = randomToken();
@@ -239,11 +259,14 @@ export class ScanService {
         'owner_reply',
         'escalated_at',
         'expires_at',
+        'scanner_country',
+        'scanner_waiting_at',
       ])
       .where('id', '=', alertId)
       .where('status_view_hash', '=', sha256(statusToken))
       .executeTakeFirst();
     if (!a) return null;
+    const followupMinutes = Number(await this.settings.get('followup.after_ack_minutes', 15));
     const delivered = await this.db
       .selectFrom('alert_deliveries')
       .select((eb) => eb.fn.min('sent_at').as('at'))
@@ -266,6 +289,87 @@ export class ScanService {
       ownerReply: a.owner_reply,
       escalatedAt: a.escalated_at,
       expiresAt: a.expires_at,
+      // The scanner's own country (24 h), so guidance names the right emergency numbers (SC-13).
+      country: a.scanner_country,
+      // SC-14: "Ich warte noch" becomes available 15 min (configurable) after acknowledgement, once.
+      waitingAvailableAt:
+        a.status === 'acknowledged' && a.acknowledged_at && !a.scanner_waiting_at
+          ? new Date(a.acknowledged_at.getTime() + followupMinutes * 60_000)
+          : null,
+      waitingSentAt: a.scanner_waiting_at,
     };
+  }
+
+  /** SC-14 / NT-09: one reminder to the owner when the scanner is still waiting after acknowledgement. */
+  async stillWaiting(
+    alertId: string,
+    statusToken: string,
+  ): Promise<'ok' | 'not_found' | 'not_yet' | 'used'> {
+    const followupMinutes = Number(await this.settings.get('followup.after_ack_minutes', 15));
+    const escalateMinutes = Number(await this.settings.get('followup.escalate_after_minutes', 5));
+    return this.db.transaction().execute(async (trx) => {
+      const a = await trx
+        .selectFrom('alerts')
+        .innerJoin('alert_types as t', 't.code', 'alerts.alert_type')
+        .select([
+          'id',
+          'status',
+          'acknowledged_at',
+          'scanner_waiting_at',
+          'expires_at',
+          't.escalates',
+        ])
+        .where('id', '=', alertId)
+        .where('status_view_hash', '=', sha256(statusToken))
+        .forUpdate()
+        .executeTakeFirst();
+      if (!a) return 'not_found';
+      if (a.scanner_waiting_at) return 'used';
+      const availableAt = a.acknowledged_at
+        ? a.acknowledged_at.getTime() + followupMinutes * 60_000
+        : Number.POSITIVE_INFINITY;
+      if (a.status !== 'acknowledged' || availableAt > Date.now() || a.expires_at < new Date()) {
+        return 'not_yet';
+      }
+      await trx
+        .updateTable('alerts')
+        .set({
+          scanner_waiting_at: sql`now()`,
+          // SC-14: escalation (if the type escalates) at most N minutes later unless the owner replies.
+          // Whether an emergency contact exists is checked by the escalation job (NT-03).
+          ...(a.escalates
+            ? {
+                escalate_at: sql`CASE WHEN escalated_at IS NULL
+                  THEN least(coalesce(escalate_at, 'infinity'::timestamptz), now() + make_interval(mins => ${escalateMinutes}))
+                  ELSE escalate_at END`,
+              }
+            : {}),
+        })
+        .where('id', '=', a.id)
+        .execute();
+      await trx
+        .insertInto('outbox_events')
+        .values({ topic: FOLLOWUP_TOPIC, payload: JSON.stringify({ alertId: a.id }) })
+        .execute();
+      return 'ok';
+    });
+  }
+
+  /** SC-15 / US-19: "Aufkleber sieht verdächtig aus" — lands in the abuse centre (AD-08). */
+  async reportFake(
+    token: NonNullable<Awaited<ReturnType<ScanService['lookup']>>>,
+    note: string | undefined,
+    ctx: ScanContext,
+  ): Promise<void> {
+    await this.limits.enforce('report.fake_ip', ctx.ipPrefix);
+    await this.db
+      .insertInto('abuse_reports')
+      .values({
+        kind: 'fake_decal',
+        qr_token_id: token.tokenId,
+        reason: 'fake_decal',
+        note: note?.trim().slice(0, 500) || null,
+      })
+      .execute();
   }
 }

@@ -17,8 +17,33 @@ end
 return {1, tonumber(ARGV[1]) - n}
 `;
 
+// Several limits at once: check every counter first, and only if all pass, count the request on all
+// of them. A request rejected by one limit therefore consumes none of the others (02-architecture §5).
+const MULTI_SCRIPT = `
+for i = 1, #KEYS do
+  local n = tonumber(redis.call('GET', KEYS[i]) or '0')
+  if n >= tonumber(ARGV[i * 2 - 1]) then
+    local ttl = redis.call('TTL', KEYS[i])
+    if ttl < 0 then ttl = tonumber(ARGV[i * 2]) end
+    return {0, i, ttl}
+  end
+end
+for i = 1, #KEYS do
+  local n = redis.call('INCR', KEYS[i])
+  if n == 1 then redis.call('EXPIRE', KEYS[i], ARGV[i * 2]) end
+end
+return {1, 0, 0}
+`;
+
 /** Named limits with their defaults. Runtime values come from app_settings key `ratelimit.<name>`. */
 export const RATE_LIMITS = {
+  // US-17: the three scanner limits (02-architecture §5)
+  'alert.scanner_vehicle': { max: 1, windowSeconds: 900 },
+  'alert.scanner_global': { max: 6, windowSeconds: 3600 },
+  'alert.vehicle': { max: 20, windowSeconds: 86_400 },
+  'report.fake_ip': { max: 5, windowSeconds: 3600 },
+  'whatsapp.otp_user': { max: 3, windowSeconds: 3600 },
+  'whatsapp.otp_phone': { max: 5, windowSeconds: 86_400 },
   'magic_link.ip': { max: 30, windowSeconds: 3600 },
   'magic_link.email': { max: 5, windowSeconds: 3600 },
   'cancel.ip': { max: 10, windowSeconds: 3600 },
@@ -36,8 +61,14 @@ export interface RateLimitResult {
 }
 
 export class RateLimitedException extends HttpException {
-  constructor(public readonly retryAfterSeconds: number) {
-    super({ error: 'rate_limited', retryAfterSeconds }, HttpStatus.TOO_MANY_REQUESTS);
+  constructor(
+    public readonly retryAfterSeconds: number,
+    limit?: RateLimitName,
+  ) {
+    super(
+      { error: 'rate_limited', retryAfterSeconds, ...(limit ? { limit } : {}) },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 }
 
@@ -62,6 +93,22 @@ export class RateLimitService {
   async enforce(name: RateLimitName, subject: string): Promise<void> {
     const { max, windowSeconds } = await this.settings.get(`ratelimit.${name}`, RATE_LIMITS[name]);
     const r = await this.hit(`${name}:${subject}`, max, windowSeconds);
-    if (!r.allowed) throw new RateLimitedException(r.retryAfterSeconds);
+    if (!r.allowed) throw new RateLimitedException(r.retryAfterSeconds, name);
+  }
+
+  /** All-or-nothing check of several named limits (US-17). */
+  async enforceAll(limits: { name: RateLimitName; subject: string }[]): Promise<void> {
+    const values = await Promise.all(
+      limits.map((l) => this.settings.get(`ratelimit.${l.name}`, RATE_LIMITS[l.name])),
+    );
+    const keys = limits.map((l) => `rl:${l.name}:${l.subject}`);
+    const args = values.flatMap((v) => [v.max, v.windowSeconds]);
+    const [ok, index, ttl] = (await this.valkey.eval(
+      MULTI_SCRIPT,
+      keys.length,
+      ...keys,
+      ...args,
+    )) as [number, number, number];
+    if (ok !== 1) throw new RateLimitedException(ttl, limits[index - 1]!.name);
   }
 }

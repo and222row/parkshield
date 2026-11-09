@@ -7,6 +7,7 @@ import { buildPublicApp } from '../apps';
 import { loadEnv, type Env } from '../config/env';
 import type { Db } from '../core/core.module';
 import { createLogger } from '../core/logger';
+import { SettingsService } from '../core/settings.service';
 import { DB } from '../core/tokens';
 import { DEV_CAPTCHA_SOLUTION } from '../providers/captcha';
 
@@ -25,6 +26,42 @@ export interface Harness {
 
 /** Public app against parkshield_test + Valkey DB 1, with every provider faked. */
 export const PRINT_DIR = join(tmpdir(), `ps-print-${process.pid}`);
+export const TEST_WA_WEBHOOK_SECRET = 'test-whatsapp-webhook-secret';
+
+// Original values of settings changed by setSetting (undefined = key did not exist).
+const touched = new Map<string, unknown>();
+
+async function restoreTouched(h: Harness): Promise<void> {
+  for (const [key, original] of touched) {
+    if (original === undefined)
+      await h.db.deleteFrom('app_settings').where('key', '=', key).execute();
+    else
+      await h.db
+        .insertInto('app_settings')
+        .values({ key, value: JSON.stringify(original) })
+        .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify(original) }))
+        .execute();
+  }
+  touched.clear();
+}
+
+/** Sets a runtime setting for one test; the next resetState (or close) restores the original. */
+export async function setSetting(h: Harness, key: string, value: unknown): Promise<void> {
+  if (!touched.has(key)) {
+    const row = await h.db
+      .selectFrom('app_settings')
+      .select('value')
+      .where('key', '=', key)
+      .executeTakeFirst();
+    touched.set(key, row?.value);
+  }
+  await h.db
+    .insertInto('app_settings')
+    .values({ key, value: JSON.stringify(value) })
+    .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify(value) }))
+    .execute();
+  h.app.get(SettingsService).invalidate();
+}
 
 export async function createHarness(): Promise<Harness> {
   const env = loadEnv({
@@ -34,21 +71,25 @@ export async function createHarness(): Promise<Harness> {
     FRIENDLY_CAPTCHA_SITEKEY: '',
     PRINT_PARTNER: '',
     PRINT_OUTBOX_DIR: PRINT_DIR,
+    D360_API_KEY: '',
+    D360_WEBHOOK_SECRET: TEST_WA_WEBHOOK_SECRET,
   });
   const app = await buildPublicApp(env, createLogger(env));
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
   const valkey = new Redis(env.VALKEY_URL);
-  return {
+  const h: Harness = {
     app,
     db: app.get<Db>(DB),
     valkey,
     env,
     async close() {
+      await restoreTouched(h);
       valkey.disconnect();
       await app.close();
     },
   };
+  return h;
 }
 
 let settingsSeed: { key: string; value: unknown }[] | null = null;
@@ -58,6 +99,7 @@ let settingsSeed: { key: string; value: unknown }[] | null = null;
  * so the seeded runtime settings are snapshotted once and put back after every reset.
  */
 export async function resetState(h: Harness): Promise<void> {
+  await restoreTouched(h);
   settingsSeed ??= await h.db.selectFrom('app_settings').select(['key', 'value']).execute();
   await sql`TRUNCATE users, business_waitlist, promo_codes, partners, outbox_events RESTART IDENTITY CASCADE`.execute(
     h.db,
@@ -72,6 +114,7 @@ export async function resetState(h: Harness): Promise<void> {
       .execute();
   }
   await h.valkey.flushdb();
+  h.app.get(SettingsService).invalidate();
 }
 
 export interface DevMail {

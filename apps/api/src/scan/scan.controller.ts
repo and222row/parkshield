@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   Headers,
+  HttpCode,
   Inject,
   NotFoundException,
   Param,
@@ -21,6 +23,10 @@ import { ZodPipe } from '../core/zod.pipe';
 import { CAPTCHA, type Captcha } from '../providers/ports';
 import { ScanService } from './scan.service';
 
+const ReportFake = z.object({
+  note: z.string().max(500).optional(),
+  captcha: z.string().max(4096).optional(),
+});
 const CreateAlert = z.object({
   type: z.enum(ALERT_TYPE_CODES),
   message: z.string().max(CUSTOM_MESSAGE_MAX).optional(),
@@ -65,7 +71,40 @@ export class ScanController {
     return this.scan.createAlert(token, body, {
       ipPrefix: truncateIp(req.ip),
       userAgent: String(req.headers['user-agent'] ?? ''),
+      ip: req.ip,
     });
+  }
+
+  @Post('scan/:code/report-fake')
+  @HttpCode(202)
+  async reportFake(
+    @Param('code') code: string,
+    @Body(new ZodPipe(ReportFake)) body: z.infer<typeof ReportFake>,
+    @Req() req: FastifyRequest,
+  ) {
+    if (!(await this.captcha.verify(body.captcha))) {
+      throw new BadRequestException({ error: 'captcha_failed' });
+    }
+    const token = await this.resolve(code, req);
+    await this.scan.reportFake(token, body.note, {
+      ipPrefix: truncateIp(req.ip),
+      userAgent: String(req.headers['user-agent'] ?? ''),
+    });
+    return { ok: true };
+  }
+
+  /** "Ich warte noch" (SC-14): usable once, from 15 min after the owner's acknowledgement. */
+  @Post('alerts/:id/waiting')
+  @HttpCode(200)
+  async waiting(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Headers('x-status-token') statusToken: string | undefined,
+  ) {
+    const r = statusToken ? await this.scan.stillWaiting(id, statusToken) : 'not_found';
+    if (r === 'not_found') throw new NotFoundException({ error: 'not_found' });
+    if (r === 'used') throw new ConflictException({ error: 'already_sent' });
+    if (r === 'not_yet') throw new ConflictException({ error: 'not_available_yet' });
+    return { ok: true };
   }
 
   @Get('alerts/:id/status')

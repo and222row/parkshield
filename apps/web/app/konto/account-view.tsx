@@ -30,12 +30,14 @@ export function AccountView({
   subscription,
   invoices,
   vehicleCount,
+  channels,
   checkout,
 }: {
   me: Me;
   subscription: SubscriptionSummary | null;
   invoices: InvoiceSummary[];
   vehicleCount: number;
+  channels: { push: number; whatsapp: boolean };
   checkout?: 'success' | 'canceled';
 }) {
   const { t, locale } = useI18n();
@@ -125,6 +127,26 @@ export function AccountView({
               </Link>
             </Card>
           )}
+
+          <Card className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Heading level={2} className="text-xl">
+                {t('channels.title')}
+              </Heading>
+              <Text muted>
+                {t('channels.summary', {
+                  push: channels.push,
+                  whatsapp: channels.whatsapp ? 'yes' : 'no',
+                })}
+              </Text>
+            </div>
+            <Link
+              href="/konto/benachrichtigungen"
+              className="inline-flex min-h-12 items-center rounded-xl bg-primary px-5 font-semibold text-primary-fg hover:bg-primary-hover"
+            >
+              {t('channels.manage')}
+            </Link>
+          </Card>
 
           <Card>
             <Stack gap={3}>

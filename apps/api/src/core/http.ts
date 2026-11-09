@@ -22,6 +22,13 @@ export async function createHttpApp(
     rawBody: true, // Stripe webhook signatures are computed over the raw body
   });
   await app.register(fastifyCookie as never);
+  // Encrypted Web Push bodies (aes128gcm) for the local push receiver in DevController.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) =>
+      done(null, body),
+    );
   app.enableShutdownHooks();
   return app;
 }

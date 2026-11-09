@@ -123,10 +123,22 @@ ${data.backAt ? '<p class="note info" id="backat"></p>' : ''}
 <h2 id="sh" ${label('statusTitle')}</h2>
 <ol class="steps" id="steps"><li ${label('stepSent')}</li><li ${label('stepDelivered')}</li><li class="final" ${label('stepAcknowledged')}</li></ol>
 <p id="result" class="note info" role="status" aria-live="polite"></p>
+<div id="waitbox" hidden><button type="button" id="wait" class="primary" ${label('waitingButton')}</button><p class="hint" ${label('waitingHint')}</p></div>
+<div id="guide" class="note warn" hidden><h3 ${label('guideTitle')}</h3><p id="g-office"></p><p><a id="g-search" rel="noopener noreferrer" target="_blank"></a></p><p id="g-police"></p><p id="g-emergency"></p></div>
 <p id="offline" class="note warn" hidden ${label('offline')}</p>
-<p class="muted" ${label('emergency')}</p>
+<p class="muted" id="emergency-line" ${label('emergency')}</p>
 <button type="button" id="another" class="secondary" ${label('another')}</button>
 </section>
+<p><button type="button" id="report-open" class="linkbtn" aria-expanded="false" aria-controls="report" ${label('reportLink')}</button></p>
+<form id="report" hidden aria-labelledby="rh">
+<h2 id="rh" ${label('reportTitle')}</h2>
+<p class="muted" ${label('reportText')}</p>
+<label for="rnote" ${label('reportLabel')}</label>
+<textarea id="rnote" maxlength="500"></textarea>
+<p id="rerr" class="note err" role="alert" hidden></p>
+<button type="submit" id="rsend" class="primary" ${label('reportSend')}</button>
+</form>
+<p id="rdone" class="note ok" role="status" hidden ${label('reportThanks')}</p>
 ${captcha.mode === 'frc' ? `<div id="frc" data-sitekey="${esc(captcha.sitekey)}" hidden></div>` : ''}
 ${footer(s)}
 </main>

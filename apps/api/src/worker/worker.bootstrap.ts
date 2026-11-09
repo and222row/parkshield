@@ -2,7 +2,7 @@ import { Inject, Injectable, type OnApplicationBootstrap } from '@nestjs/common'
 import { BillingService } from '../billing/billing.service';
 import { DispatchService } from '../notifications/dispatch.service';
 import { OrdersService, PRINT_TOPIC } from '../orders/orders.service';
-import { DISPATCH_TOPIC } from '../scan/scan.service';
+import { DISPATCH_TOPIC, FOLLOWUP_TOPIC } from '../scan/scan.service';
 import { OutboxService } from './outbox.service';
 import { SchedulerService } from './scheduler.service';
 
@@ -22,6 +22,7 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
   onApplicationBootstrap() {
     this.outbox.register(PRINT_TOPIC, (p) => this.orders.submitToPrinter(String(p.orderId)));
     this.outbox.register(DISPATCH_TOPIC, (p) => this.dispatch.dispatch(String(p.alertId)));
+    this.outbox.register(FOLLOWUP_TOPIC, (p) => this.dispatch.followup(String(p.alertId)));
     this.outbox.start();
     this.scheduler.every({
       name: 'subscriptions.expire',

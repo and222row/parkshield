@@ -2,6 +2,36 @@ export const MAILER = Symbol('MAILER');
 export const CAPTCHA = Symbol('CAPTCHA');
 export const PAYMENTS = Symbol('PAYMENTS');
 export const PRINT = Symbol('PRINT');
+export const PUSH = Symbol('PUSH');
+export const WHATSAPP = Symbol('WHATSAPP');
+
+export interface PushTarget {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+/** Web Push via VAPID (no provider account). Returns the push service's HTTP status. */
+export interface PushSender {
+  send(
+    target: PushTarget,
+    payload: string,
+    opts: { ttlSeconds: number; urgency: 'normal' | 'high' },
+  ): Promise<{ statusCode: number }>;
+}
+
+export type WhatsAppTemplate = 'ps_otp' | 'ps_alert' | 'ps_test' | 'ps_followup';
+
+/** WhatsApp Business utility/authentication templates via the BSP (360dialog). */
+export interface WhatsAppSender {
+  sendTemplate(input: {
+    /** E.164 without the leading "+" */
+    to: string;
+    template: WhatsAppTemplate;
+    lang: 'de' | 'en';
+    params: string[];
+  }): Promise<{ messageId: string }>;
+}
 
 export interface ShippingAddress {
   name: string;

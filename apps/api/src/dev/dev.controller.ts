@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Inject,
   NotFoundException,
@@ -22,6 +23,9 @@ import type { FakePayments, FakeSession } from '../providers/fake-payments';
 import { DEV_MAILBOX_KEY } from '../providers/mailer';
 import { simplePdf } from '../providers/pdf';
 import { PAYMENTS } from '../providers/ports';
+import { DEV_WHATSAPP_KEY } from '../providers/whatsapp';
+
+export const DEV_PUSH_KEY = 'dev:push';
 
 const Complete = z.object({ sessionId: z.string().startsWith('cs_fake_').max(64) });
 const Fail = z.object({ email: z.email(), final: z.boolean().default(false) });
@@ -45,6 +49,48 @@ export class DevController {
   async mailbox() {
     const rows = await this.valkey.lrange(DEV_MAILBOX_KEY, 0, 49);
     return { mails: rows.map((r) => JSON.parse(r) as unknown) };
+  }
+
+  @Get('whatsapp')
+  async whatsappInbox() {
+    const rows = await this.valkey.lrange(DEV_WHATSAPP_KEY, 0, 49);
+    return { messages: rows.map((r) => JSON.parse(r) as unknown) };
+  }
+
+  /**
+   * A local stand-in for a browser push service: register http://127.0.0.1:4000/v1/dev/push/<name>
+   * as an endpoint. Names starting with "gone" answer 410, "fail" answer 500 (NT-06).
+   * Only the delivery headers are kept; the body is encrypted for the browser anyway.
+   */
+  @Post('push/:name')
+  async pushReceiver(
+    @Param('name') name: string,
+    @Headers('urgency') urgency: string | undefined,
+    @Headers('ttl') ttl: string | undefined,
+    @Res() reply: FastifyReply,
+  ) {
+    const status = name.startsWith('gone') ? 410 : name.startsWith('fail') ? 500 : 201;
+    await this.valkey
+      .multi()
+      .lpush(
+        DEV_PUSH_KEY,
+        JSON.stringify({
+          name: name.slice(0, 40),
+          status,
+          urgency,
+          ttl,
+          at: new Date().toISOString(),
+        }),
+      )
+      .ltrim(DEV_PUSH_KEY, 0, 49)
+      .exec();
+    return reply.status(status).send();
+  }
+
+  @Get('push')
+  async pushInbox() {
+    const rows = await this.valkey.lrange(DEV_PUSH_KEY, 0, 49);
+    return { pushes: rows.map((r) => JSON.parse(r) as unknown) };
   }
 
   private amount(s: FakeSession) {

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import {
   serverApi,
+  type ChannelsOverview,
   type InvoiceSummary,
   type Me,
   type SubscriptionSummary,
@@ -18,10 +19,11 @@ export default async function AccountPage({
 }) {
   const me = await serverApi<Me>('/v1/me');
   if (me.status === 401 || !me.data) redirect('/anmelden');
-  const [sub, invoices, vehicles] = await Promise.all([
+  const [sub, invoices, vehicles, channels] = await Promise.all([
     serverApi<{ subscription: SubscriptionSummary | null }>('/v1/billing/subscription'),
     serverApi<{ invoices: InvoiceSummary[] }>('/v1/billing/invoices'),
     serverApi<{ vehicles: Vehicle[] }>('/v1/vehicles'),
+    serverApi<ChannelsOverview>('/v1/channels'),
   ]);
   const { checkout } = await searchParams;
   return (
@@ -30,6 +32,10 @@ export default async function AccountPage({
       subscription={sub.data?.subscription ?? null}
       invoices={invoices.data?.invoices ?? []}
       vehicleCount={vehicles.data?.vehicles.length ?? 0}
+      channels={{
+        push: channels.data?.push.devices.length ?? 0,
+        whatsapp: Boolean(channels.data?.whatsapp),
+      }}
       checkout={checkout === 'success' || checkout === 'canceled' ? checkout : undefined}
     />
   );

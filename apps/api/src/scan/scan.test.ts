@@ -267,6 +267,9 @@ describe('sending an alert (US-14, US-15, US-16)', () => {
       })
       .execute();
     await h.db.deleteFrom('outbox_events').execute();
+    // The per-vehicle scanner limit (1 per 15 min) is not what this test is about.
+    const keys = await h.valkey.keys('rl:*');
+    if (keys.length) await h.valkey.del(...keys);
     const res = await send(code, { type: 'lights_on' });
     expect(res.statusCode).toBe(201);
     expect(await h.db.selectFrom('outbox_events').selectAll().execute()).toHaveLength(0);

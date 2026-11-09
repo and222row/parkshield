@@ -18,6 +18,20 @@ export async function serverApi<T>(path: string): Promise<{ status: number; data
   }
 }
 
+export interface PushDevice {
+  id: string;
+  platform: 'ios' | 'android' | 'desktop' | null;
+  label: string | null;
+  createdAt: string;
+  lastOkAt: string | null;
+}
+
+export interface ChannelsOverview {
+  email: { address: string };
+  push: { publicKey: string; devices: PushDevice[] };
+  whatsapp: { phone: string; verifiedAt: string; enabled: boolean } | null;
+}
+
 export interface Me {
   email: string;
   preferredLang: 'de' | 'en';

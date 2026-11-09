@@ -32,6 +32,12 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().default('ParkShield <hallo@parkshield.de>'),
   FRIENDLY_CAPTCHA_SITEKEY: z.string().default(''),
   FRIENDLY_CAPTCHA_API_KEY: z.string().default(''),
+  VAPID_PUBLIC_KEY: z.string().min(20),
+  VAPID_PRIVATE_KEY: z.string().min(20),
+  VAPID_SUBJECT: z.string().default('mailto:hallo@parkshield.de'),
+  D360_API_KEY: z.string().default(''),
+  D360_BASE_URL: z.url().default('https://waba-v2.360dialog.io'),
+  D360_WEBHOOK_SECRET: z.string().default(''),
   PRINT_PARTNER: z.string().default(''),
   PRINT_OUTBOX_DIR: z.string().default(''),
 });
@@ -42,6 +48,7 @@ export function fakeProviders(env: Env) {
     mail: !env.BREVO_API_KEY,
     captcha: !env.FRIENDLY_CAPTCHA_API_KEY || !env.FRIENDLY_CAPTCHA_SITEKEY,
     payments: !env.STRIPE_SECRET_KEY,
+    whatsapp: !env.D360_API_KEY,
     // No real print partner adapter yet: it is built once the partner is chosen in Phase 0.
     print: !env.PRINT_PARTNER,
   };
