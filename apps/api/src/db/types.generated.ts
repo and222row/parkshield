@@ -217,6 +217,7 @@ export interface BreakGlassRequests {
 
 export interface BusinessWaitlist {
   company_name: string;
+  confirm_token_hash: Buffer | null;
   confirmed_at: Timestamp | null;
   contact_email: string;
   contacted_at: Timestamp | null;
@@ -533,6 +534,7 @@ export interface StaffRoles {
 export interface Subscriptions {
   cancel_at_period_end: Generated<boolean>;
   canceled_at: Timestamp | null;
+  contract_no: string | null;
   created_at: Generated<Timestamp>;
   current_period_end: Timestamp | null;
   current_period_start: Timestamp | null;

@@ -18,6 +18,11 @@ const config: NextConfig = {
   transpilePackages: ['@parkshield/ui'],
   poweredByHeader: false,
   reactStrictMode: true,
+  // Same-origin /v1 in every environment: Caddy routes it to the API in production, Next proxies it locally.
+  async rewrites() {
+    const api = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+    return [{ source: '/v1/:path*', destination: `${api}/v1/:path*` }];
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

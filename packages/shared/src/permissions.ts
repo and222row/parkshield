@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   'promo.manage',
   'orders.manage',
   'tokens.manage',
+  'partners.manage',
   'dsr.process',
   'settings.edit',
   'audit.read',
@@ -28,7 +29,10 @@ export const STAFF_ROLES = [
 ] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-const ADMIN: Permission[] = PERMISSIONS.filter((p) => p !== 'staff.manage');
+// Reading blocked message content needs the dedicated moderator permission, even for admins (AD-09).
+const ADMIN: Permission[] = PERMISSIONS.filter(
+  (p) => p !== 'staff.manage' && p !== 'moderation.review',
+);
 
 export const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
   support: ['customer.read_masked', 'alerts.read_metadata', 'pii.decrypt_request'],

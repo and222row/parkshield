@@ -1,6 +1,6 @@
 import { IntlMessageFormat, type PrimitiveType } from 'intl-messageformat';
-import de from './messages/de.json';
-import en from './messages/en.json';
+import de from './messages/de';
+import en from './messages/en';
 
 export const LOCALES = ['de', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];

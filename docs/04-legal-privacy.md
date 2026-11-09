@@ -69,6 +69,7 @@ The co-driver needs their own account (no subscription) and must explicitly acce
 | Parking location (Phase 2) | 24 h after session end | `run_retention` |
 | Shipping address | 90 days after delivery | `run_retention` (invoices kept in accounting) |
 | Unaccepted invitations | 14 days | `run_retention` |
+| Sign-ups that never verified their e-mail | 24 h | `run_retention` |
 | Temporary modes / transfer requests | 1 day after end / 90 days | `run_retention` |
 | Unconfirmed Business waitlist entries | 30 days | `run_retention` |
 | Provider health events | 90 days | `run_retention` |

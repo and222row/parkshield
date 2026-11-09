@@ -1,0 +1,33 @@
+import { redirect } from 'next/navigation';
+import {
+  serverApi,
+  type InvoiceSummary,
+  type Me,
+  type SubscriptionSummary,
+} from '@/lib/api-server';
+import { AccountView } from './account-view';
+
+export const metadata = { title: 'Mein Konto', robots: { index: false } };
+export const dynamic = 'force-dynamic';
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
+  const me = await serverApi<Me>('/v1/me');
+  if (me.status === 401 || !me.data) redirect('/anmelden');
+  const [sub, invoices] = await Promise.all([
+    serverApi<{ subscription: SubscriptionSummary | null }>('/v1/billing/subscription'),
+    serverApi<{ invoices: InvoiceSummary[] }>('/v1/billing/invoices'),
+  ]);
+  const { checkout } = await searchParams;
+  return (
+    <AccountView
+      me={me.data}
+      subscription={sub.data?.subscription ?? null}
+      invoices={invoices.data?.invoices ?? []}
+      checkout={checkout === 'success' || checkout === 'canceled' ? checkout : undefined}
+    />
+  );
+}
