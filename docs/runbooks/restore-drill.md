@@ -34,7 +34,22 @@ npm run db:restore-drill
 
 Takes a consistent logical backup of every table (`REPEATABLE READ` snapshot), rebuilds a fresh database from `db/migrations`, restores the data, resets identity sequences and compares every table by row count and content checksum. Passes only if all tables match.
 
-## 3. Drill log
+## 3. Valkey chaos check (US-25, same day as the restore drill)
+
+PostgreSQL is the source of truth for alerts and escalation; Valkey only holds rate-limit counters, job locks, the daily scanner salt and caches. A Valkey restart must not lose an escalation or break a reply link. Run on **staging**:
+
+1. Scan a staging decal (escalating type, owner with a confirmed emergency contact). Do not reply.
+2. Restart Valkey: `sudo systemctl restart valkey-server` (or `FLUSHALL` on the staging instance).
+3. Verify:
+   - The owner's reply link from the alert e-mail still opens and shows the three buttons.
+   - Without a reply, the contact receives the escalation e-mail within the configured delay ± 60 s.
+   - Exactly one escalation e-mail (check `alert_deliveries` with `recipient = 'emergency_contact'`).
+   - The worker log shows `alerts.escalate` running again within 10 s of Valkey coming back.
+4. Record the result in the drill log below with type "Valkey chaos".
+
+The same behaviour is covered automatically by `replies.test.ts` ("keeps working after a Valkey restart").
+
+## 4. Drill log
 
 | Date | Environment | Type | Data | Duration | Result | By |
 |---|---|---|---|---|---|---|

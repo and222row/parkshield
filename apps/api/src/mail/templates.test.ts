@@ -21,6 +21,17 @@ const values = {
   owner: 'Jonas',
   hasOwner: 'yes',
   decision: 'confirmed',
+  months: 11,
+  step: 1,
+  steps: 3,
+  since: new Date('2027-07-03T09:15:00Z'),
+  alerts: 2,
+  vehicles: 1,
+  active: 1,
+  score: 75,
+  used: 8,
+  limit: 10,
+  channel: 'WhatsApp',
 };
 
 describe('mail templates', () => {

@@ -12,6 +12,7 @@ import type { Env } from '../config/env';
 import type { Db } from '../core/core.module';
 import { randomToken, sha256, type FieldCrypto } from '../core/crypto';
 import { RateLimitService } from '../core/rate-limit.service';
+import { SettingsService } from '../core/settings.service';
 import { CRYPTO, DB, ENV } from '../core/tokens';
 import type { ConsentState } from '../db/types.generated';
 import { MailService } from '../mail/mail.service';
@@ -39,6 +40,7 @@ export class EmergencyContactsService {
     @Inject(EntitlementService) private readonly entitlements: EntitlementService,
     @Inject(RateLimitService) private readonly limits: RateLimitService,
     @Inject(MailService) private readonly mail: MailService,
+    @Inject(SettingsService) private readonly settings: SettingsService,
   ) {}
 
   async list(userId: string) {
@@ -61,7 +63,7 @@ export class EmergencyContactsService {
         .execute(),
       this.db
         .selectFrom('users')
-        .select('display_name')
+        .select(['display_name', 'escalation_minutes'])
         .where('id', '=', userId)
         .executeTakeFirstOrThrow(),
       this.entitlements.current(userId),
@@ -69,6 +71,9 @@ export class EmergencyContactsService {
     return {
       limit: ent?.limits.emergency_contacts ?? 0,
       ownerName: owner.display_name,
+      // OW-07: the owner's delay (3–30 min) or null for the default.
+      escalationMinutes: owner.escalation_minutes,
+      defaultEscalationMinutes: Number(await this.settings.get('escalation.default_minutes', 7)),
       contacts: rows.map((r) => ({
         id: r.id,
         name: r.display_name,

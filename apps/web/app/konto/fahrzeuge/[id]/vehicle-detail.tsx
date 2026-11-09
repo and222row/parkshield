@@ -29,8 +29,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { PageShell } from '@/components/site-chrome';
 import { api, ApiError, errorText } from '@/lib/api-client';
-import type { OrderSummary, Vehicle } from '@/lib/api-server';
+import type { OrderSummary, Vehicle, VehicleMode } from '@/lib/api-server';
 import { VehicleForm } from '../vehicles-view';
+import { ModeCard } from './mode-card';
 
 const CUSTOM = '__custom__';
 
@@ -431,7 +432,9 @@ export function VehicleDetail({
   orders: initialOrders,
   includedAvailable,
   orderResult,
+  mode,
 }: {
+  mode: VehicleMode | null;
   vehicle: Vehicle;
   orders: OrderSummary[];
   includedAvailable: boolean;
@@ -466,6 +469,7 @@ export function VehicleDetail({
           </div>
 
           {vehicle.decal && <DecalTest key={vehicle.decal.tokenId} vehicle={vehicle} />}
+          <ModeCard vehicleId={vehicle.id} initial={mode} />
           {vehicle.decal && (
             <Designer key={`d-${vehicle.decal.tokenId}`} vehicle={vehicle} onSaved={setVehicle} />
           )}

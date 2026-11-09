@@ -100,9 +100,69 @@ export function ContactsView({
               )}
             </Stack>
           </Card>
+
+          {plan && (
+            <DelayCard
+              value={data.escalationMinutes}
+              defaultMinutes={data.defaultEscalationMinutes}
+            />
+          )}
         </Stack>
       </Container>
     </PageShell>
+  );
+}
+
+const DELAYS = [3, 5, 7, 10, 15, 20, 30];
+
+/** OW-07: how long we wait for the owner before the emergency contact is told (3–30 min). */
+function DelayCard({ value, defaultMinutes }: { value: number | null; defaultMinutes: number }) {
+  const { t } = useI18n();
+  const [minutes, setMinutes] = useState(value === null ? '' : String(value));
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function save(next: string) {
+    setMinutes(next);
+    setStatus(null);
+    try {
+      await api('/v1/me', {
+        method: 'PATCH',
+        body: { escalationMinutes: next === '' ? null : Number(next) },
+      });
+      setStatus(t('contacts.delaySaved'));
+    } catch (err) {
+      setStatus(errorText(err, t));
+    }
+  }
+
+  return (
+    <Card>
+      <Stack gap={3}>
+        <Heading level={2} className="text-xl">
+          {t('contacts.delayTitle')}
+        </Heading>
+        <Field label={t('contacts.delayLabel')}>
+          {({ id }) => (
+            <Select
+              id={id}
+              className="max-w-xs"
+              value={minutes}
+              onChange={(e) => void save(e.target.value)}
+            >
+              <option value="">{t('contacts.delayDefault', { minutes: defaultMinutes })}</option>
+              {DELAYS.map((d) => (
+                <option key={d} value={d}>
+                  {t('contacts.delayOption', { minutes: d })}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <p role="status" className="text-sm text-muted">
+          {status}
+        </p>
+      </Stack>
+    </Card>
   );
 }
 

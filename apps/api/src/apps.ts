@@ -38,6 +38,10 @@ import { AckService } from './notifications/ack.service';
 import { DispatchService } from './notifications/dispatch.service';
 import { EscalationService } from './notifications/escalation.service';
 import { WhatsAppWebhookService } from './notifications/whatsapp-webhook.service';
+import { FairUseService } from './notifications/fair-use.service';
+import { PreferencesController } from './preferences/preferences.controller';
+import { PreferencesService } from './preferences/preferences.service';
+import { RemindersService } from './preferences/reminders.service';
 import { ScanController } from './scan/scan.controller';
 import { ScanService } from './scan/scan.service';
 import { ScannerRefService } from './scan/scanner-ref.service';
@@ -61,6 +65,9 @@ const domainProviders = [
   EscalationService,
   AckService,
   EmergencyContactsService,
+  PreferencesService,
+  FairUseService,
+  RemindersService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -82,6 +89,7 @@ export class PublicAppModule {
         OrdersController,
         ScanController,
         ChannelsController,
+        PreferencesController,
         WhatsAppWebhookController,
         AckController,
         EmergencyContactsController,

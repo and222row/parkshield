@@ -17,12 +17,27 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { PageShell } from '@/components/site-chrome';
 import { api, ApiError, errorText } from '@/lib/api-client';
-import type { ChannelsOverview, OrderableChannel, PushDevice } from '@/lib/api-server';
+import type {
+  ChannelsOverview,
+  OrderableChannel,
+  PushDevice,
+  QuietHours,
+  Usage,
+} from '@/lib/api-server';
+import { QuietHoursCard } from './quiet-hours';
 import { useBrowserValue } from '@/lib/use-browser-value';
 
 type Message = { tone: 'success' | 'danger' | 'warning'; text: string } | null;
 
-export function NotificationsView({ initial }: { initial: ChannelsOverview }) {
+export function NotificationsView({
+  initial,
+  quiet,
+  usage,
+}: {
+  initial: ChannelsOverview;
+  quiet: QuietHours;
+  usage: Usage;
+}) {
   const { t } = useI18n();
   const [data, setData] = useState(initial);
   const reload = async () => setData(await api<ChannelsOverview>('/v1/channels'));
@@ -41,7 +56,7 @@ export function NotificationsView({ initial }: { initial: ChannelsOverview }) {
             <Text muted>{t('channels.intro')}</Text>
           </div>
           <PushCard publicKey={data.push.publicKey} devices={data.push.devices} reload={reload} />
-          <WhatsAppCard linked={data.whatsapp} reload={reload} />
+          <WhatsAppCard linked={data.whatsapp} reload={reload} usage={usage.whatsapp} />
           <Card>
             <Stack gap={2}>
               <Heading level={2} className="text-xl">
@@ -59,6 +74,7 @@ export function NotificationsView({ initial }: { initial: ChannelsOverview }) {
             }}
             onSaved={(order) => setData((d) => ({ ...d, order }))}
           />
+          <QuietHoursCard initial={quiet} />
         </Stack>
       </Container>
     </PageShell>
@@ -297,9 +313,11 @@ function IosGuide() {
 function WhatsAppCard({
   linked,
   reload,
+  usage,
 }: {
   linked: ChannelsOverview['whatsapp'];
   reload: () => Promise<void>;
+  usage: Usage['whatsapp'];
 }) {
   const { t } = useI18n();
   const [phone, setPhone] = useState('');
@@ -381,6 +399,11 @@ function WhatsAppCard({
           {t('channels.waTitle')}
         </Heading>
         <Text>{t('channels.waIntro')}</Text>
+        {linked && usage.limit > 0 && (
+          <Text muted className="text-sm">
+            {t('channels.waUsage', usage)}
+          </Text>
+        )}
         {linked ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Text className="font-semibold">{t('channels.waLinked', { phone: linked.phone })}</Text>

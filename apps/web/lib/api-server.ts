@@ -43,6 +43,8 @@ export interface EmergencyContact {
 export interface EmergencyContactList {
   limit: number;
   ownerName: string | null;
+  escalationMinutes: number | null;
+  defaultEscalationMinutes: number;
   contacts: EmergencyContact[];
 }
 
@@ -53,9 +55,43 @@ export interface ChannelsOverview {
   whatsapp: { phone: string; verifiedAt: string; enabled: boolean } | null;
 }
 
+export interface QuietRule {
+  id: string;
+  vehicleId: string | null;
+  days: number[];
+  start: string;
+  end: string;
+  urgentBypass: boolean;
+}
+
+export interface QuietHours {
+  timezone: string;
+  rules: QuietRule[];
+}
+
+export type VehicleModeKind = 'sensitive_spot' | 'short_stop';
+
+export interface VehicleMode {
+  mode: VehicleModeKind;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface Protection {
+  percent: number;
+  steps: { email: boolean; channel: boolean; contact: boolean; decal: boolean };
+}
+
+export interface Usage {
+  whatsapp: { used: number; limit: number };
+}
+
 export interface Me {
   email: string;
   preferredLang: 'de' | 'en';
+  summaryFrequency: 'off' | 'weekly' | 'monthly';
+  escalationMinutes: number | null;
+  timezone: string;
   passkeys: { id: string; label: string | null; createdAt: string; lastUsedAt: string | null }[];
 }
 

@@ -466,6 +466,7 @@ export interface QrTokens {
   created_at: Generated<Timestamp>;
   cta_header: Generated<string>;
   design_template_id: Generated<string>;
+  health_reminded_at: Timestamp | null;
   id: Generated<string>;
   key_version: Generated<number>;
   last_scanned_at: Timestamp | null;
@@ -578,9 +579,11 @@ export interface Users {
   display_name: string | null;
   email: string;
   email_verified_at: Timestamp | null;
+  escalation_minutes: number | null;
   id: Generated<string>;
   kind: Generated<UserKind>;
   last_login_at: Timestamp | null;
+  last_summary_at: Timestamp | null;
   preferred_lang: Generated<UiLang>;
   status: Generated<UserStatus>;
   stripe_customer_id: string | null;

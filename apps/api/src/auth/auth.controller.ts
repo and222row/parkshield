@@ -43,7 +43,25 @@ const PasskeyLogin = z.object({
   challengeId: z.string().max(64),
   response: z.looseObject({ id: z.string() }),
 });
-const UpdateMe = z.object({ preferredLang: locale });
+const isTimezone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat('de', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+const UpdateMe = z
+  .object({
+    preferredLang: locale,
+    // OW-18 / US-30
+    summaryFrequency: z.enum(['off', 'weekly', 'monthly']),
+    // OW-07: 3–30 min; null = default
+    escalationMinutes: z.number().int().min(3).max(30).nullable(),
+    // quiet hours are evaluated in this zone (US-26)
+    timezone: z.string().max(64).refine(isTimezone, 'unknown timezone'),
+  })
+  .partial();
 
 @Controller('v1')
 export class AuthController {
@@ -135,8 +153,22 @@ export class AuthController {
   @Get('me')
   @UseGuards(SessionGuard)
   async me(@CurrentUser() user: AuthContext) {
-    const passkeys = await this.passkeys.list(user.userId);
-    return { email: user.email, preferredLang: user.preferredLang, passkeys };
+    const [passkeys, row] = await Promise.all([
+      this.passkeys.list(user.userId),
+      this.db
+        .selectFrom('users')
+        .select(['summary_frequency', 'escalation_minutes', 'timezone'])
+        .where('id', '=', user.userId)
+        .executeTakeFirstOrThrow(),
+    ]);
+    return {
+      email: user.email,
+      preferredLang: user.preferredLang,
+      summaryFrequency: row.summary_frequency,
+      escalationMinutes: row.escalation_minutes,
+      timezone: row.timezone,
+      passkeys,
+    };
   }
 
   @Patch('me')
@@ -145,11 +177,17 @@ export class AuthController {
     @CurrentUser() user: AuthContext,
     @Body(new ZodPipe(UpdateMe)) body: z.infer<typeof UpdateMe>,
   ) {
-    await this.db
-      .updateTable('users')
-      .set({ preferred_lang: body.preferredLang })
-      .where('id', '=', user.userId)
-      .execute();
+    const set = {
+      ...(body.preferredLang ? { preferred_lang: body.preferredLang } : {}),
+      ...(body.summaryFrequency ? { summary_frequency: body.summaryFrequency } : {}),
+      ...(body.escalationMinutes !== undefined
+        ? { escalation_minutes: body.escalationMinutes }
+        : {}),
+      ...(body.timezone ? { timezone: body.timezone } : {}),
+    };
+    if (Object.keys(set).length) {
+      await this.db.updateTable('users').set(set).where('id', '=', user.userId).execute();
+    }
     return { ok: true };
   }
 

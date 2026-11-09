@@ -149,6 +149,47 @@ const templates = {
       ],
       action: 'Notfallkontakte verwalten',
     },
+    activation_reminder: {
+      subject: 'Ist Ihr Aufkleber an „{nickname}“ schon getestet?',
+      lines: [
+        'Ihr ParkShield-Aufkleber ist angekommen, aber noch nicht getestet. Erst nach dem Test wissen Sie sicher, dass Warnungen Sie erreichen.',
+        'So geht es: Aufkleber anbringen, im Konto „Aufkleber testen“ tippen und den Code mit dem Handy scannen. Das dauert eine Minute.',
+      ],
+      action: 'Aufkleber jetzt testen',
+    },
+    decal_health: {
+      subject: 'Funktioniert Ihr Aufkleber an „{nickname}“ noch?',
+      lines: [
+        'Ihr Aufkleber wurde seit {months} Monaten weder gescannt noch getestet. Sonne und Waschanlage können ihn ausbleichen.',
+        'Ein kurzer Testscan zeigt, ob er noch gut lesbar ist. Falls nicht, bestellen Sie einfach einen Ersatz.',
+      ],
+      action: 'Aufkleber testen',
+    },
+    summary: {
+      subject: 'Ihre ParkShield-Übersicht',
+      lines: [
+        'Seit {since, date, long}: {alerts, plural, =0 {keine Warnung} one {# Warnung} other {# Warnungen}} zu Ihren Fahrzeugen.',
+        '{vehicles, plural, =0 {Noch kein Fahrzeug} one {# Fahrzeug} other {# Fahrzeuge}}, davon {active, plural, =0 {keines} one {# mit aktivem Aufkleber} other {# mit aktivem Aufkleber}}. Ihr Schutz: {score} %.',
+        'Diese Übersicht ist ein Service zu Ihrem Abo. Wie oft sie kommt, stellen Sie im Konto ein.',
+      ],
+      action: 'Zum Konto',
+    },
+    fair_use_warning: {
+      subject: '{channel}: {used} von {limit} Nachrichten in diesem Monat',
+      lines: [
+        'Sie haben diesen Monat bereits {used} von {limit} {channel}-Nachrichten Ihres Tarifs genutzt.',
+        'Danach erreichen Warnungen Sie weiter per Push und E-Mail, ab dem 1. des nächsten Monats wieder per {channel}.',
+      ],
+      action: 'Benachrichtigungen ansehen',
+    },
+    fair_use_reached: {
+      subject: '{channel}-Kontingent für diesen Monat aufgebraucht',
+      lines: [
+        'Die {limit} {channel}-Nachrichten Ihres Tarifs für diesen Monat sind aufgebraucht.',
+        'Warnungen erreichen Sie bis zum Monatsende per Push und E-Mail. Schalten Sie Push ein, falls noch nicht geschehen.',
+      ],
+      action: 'Push einschalten',
+    },
   },
   en: {
     magic_link: {
@@ -289,6 +330,47 @@ const templates = {
         '{decision, select, confirmed {{contact} agreed. If you do not respond to an urgent alert, we tell {contact} by e-mail.} declined {{contact} does not want to be your emergency contact. You can invite someone else.} other {{contact} withdrew their consent. Invite someone else if needed.}}',
       ],
       action: 'Manage emergency contacts',
+    },
+    activation_reminder: {
+      subject: 'Have you tested your decal on “{nickname}” yet?',
+      lines: [
+        'Your ParkShield decal has arrived but has not been tested yet. Only after the test do you know for sure that alerts reach you.',
+        'How: apply the decal, tap “Test decal” in your account and scan the code with your phone. It takes a minute.',
+      ],
+      action: 'Test the decal now',
+    },
+    decal_health: {
+      subject: 'Is your decal on “{nickname}” still working?',
+      lines: [
+        'Your decal has not been scanned or tested for {months} months. Sun and car washes can fade it.',
+        'A quick test scan shows whether it is still easy to read. If not, simply order a replacement.',
+      ],
+      action: 'Test the decal',
+    },
+    summary: {
+      subject: 'Your ParkShield summary',
+      lines: [
+        'Since {since, date, long}: {alerts, plural, =0 {no alerts} one {# alert} other {# alerts}} about your vehicles.',
+        '{vehicles, plural, =0 {No vehicle yet} one {# vehicle} other {# vehicles}}, {active, plural, =0 {none} one {# with an active decal} other {# with an active decal}}. Your protection: {score} %.',
+        'This summary is a service of your subscription. Choose how often it comes in your account.',
+      ],
+      action: 'Open my account',
+    },
+    fair_use_warning: {
+      subject: '{channel}: {used} of {limit} messages this month',
+      lines: [
+        'You have already used {used} of the {limit} {channel} messages in your plan this month.',
+        'After that, alerts still reach you by push and e-mail, and by {channel} again from the 1st of next month.',
+      ],
+      action: 'View notifications',
+    },
+    fair_use_reached: {
+      subject: '{channel} allowance used up for this month',
+      lines: [
+        'The {limit} {channel} messages in your plan for this month are used up.',
+        'Until the end of the month, alerts reach you by push and e-mail. Turn on push if you have not yet.',
+      ],
+      action: 'Turn on push',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

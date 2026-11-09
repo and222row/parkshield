@@ -3,6 +3,7 @@ import { BillingService } from '../billing/billing.service';
 import { DispatchService } from '../notifications/dispatch.service';
 import { ESCALATE_TOPIC, EscalationService } from '../notifications/escalation.service';
 import { OrdersService, PRINT_TOPIC } from '../orders/orders.service';
+import { RemindersService } from '../preferences/reminders.service';
 import { DISPATCH_TOPIC, FOLLOWUP_TOPIC } from '../scan/scan.service';
 import { OutboxService } from './outbox.service';
 import { SchedulerService } from './scheduler.service';
@@ -19,6 +20,7 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
     @Inject(BillingService) private readonly billing: BillingService,
     @Inject(DispatchService) private readonly dispatch: DispatchService,
     @Inject(EscalationService) private readonly escalation: EscalationService,
+    @Inject(RemindersService) private readonly reminders: RemindersService,
   ) {}
 
   onApplicationBootstrap() {
@@ -31,6 +33,13 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
       name: 'subscriptions.expire',
       everyMs: HOUR,
       run: () => this.billing.expireEnded(),
+    });
+    // US-29/US-30: idempotent, so hourly runs simply catch up on whatever is due.
+    this.scheduler.every({
+      name: 'reminders',
+      everyMs: HOUR,
+      quiet: true,
+      run: () => this.reminders.runAll(),
     });
     // Escalations fall due at escalate_at; the sweeper picks them up within seconds (02-arch §3 step 8).
     this.scheduler.every({

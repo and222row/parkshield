@@ -10,6 +10,7 @@ import {
   Heading,
   Input,
   Notice,
+  Select,
   Stack,
   Text,
   useI18n,
@@ -20,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { PageShell } from '@/components/site-chrome';
 import { api, errorText } from '@/lib/api-client';
-import type { InvoiceSummary, Me, SubscriptionSummary } from '@/lib/api-server';
+import type { InvoiceSummary, Me, Protection, SubscriptionSummary } from '@/lib/api-server';
 import { useBrowserValue } from '@/lib/use-browser-value';
 
 const PLAN_LABEL = { plus: 'Plus', premium: 'Premium' } as const;
@@ -32,9 +33,13 @@ export function AccountView({
   vehicleCount,
   channels,
   contactCount,
+  protection,
+  firstVehicleId,
   checkout,
 }: {
   contactCount: number;
+  protection: Protection | null;
+  firstVehicleId: string | null;
   me: Me;
   subscription: SubscriptionSummary | null;
   invoices: InvoiceSummary[];
@@ -88,6 +93,10 @@ export function AccountView({
               {t('account.logout')}
             </Button>
           </div>
+
+          {subscription && protection && (
+            <ProtectionCard protection={protection} firstVehicleId={firstVehicleId} />
+          )}
 
           {checkout === 'success' && !subscription && (
             <Notice tone="info">{t('account.checkoutSuccess')}</Notice>
@@ -200,6 +209,8 @@ export function AccountView({
             </Stack>
           </Card>
 
+          {subscription && <SummarySettings initial={me.summaryFrequency} />}
+
           <Passkeys initial={me.passkeys} />
 
           {subscription && !subscription.cancelAtPeriodEnd && (
@@ -221,6 +232,137 @@ export function AccountView({
         </Stack>
       </Container>
     </PageShell>
+  );
+}
+
+/** OW-14 / US-28: four steps of 25 %, computed by the API from what is actually set up. */
+function ProtectionCard({
+  protection,
+  firstVehicleId,
+}: {
+  protection: Protection;
+  firstVehicleId: string | null;
+}) {
+  const { t } = useI18n();
+  const steps = [
+    { key: 'email', done: protection.steps.email, label: t('protection.stepEmail') },
+    {
+      key: 'channel',
+      done: protection.steps.channel,
+      label: t('protection.stepChannel'),
+      href: '/konto/benachrichtigungen',
+      go: t('protection.goChannel'),
+    },
+    {
+      key: 'contact',
+      done: protection.steps.contact,
+      label: t('protection.stepContact'),
+      href: '/konto/notfallkontakte',
+      go: t('protection.goContact'),
+    },
+    {
+      key: 'decal',
+      done: protection.steps.decal,
+      label: t('protection.stepDecal'),
+      href: firstVehicleId ? `/konto/fahrzeuge/${firstVehicleId}` : '/konto/fahrzeuge',
+      go: t('protection.goDecal'),
+    },
+  ];
+  const complete = protection.percent === 100;
+  return (
+    <Card>
+      <Stack gap={3}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Heading level={2} className="text-xl">
+            {t('protection.title')}
+          </Heading>
+          <Badge tone={complete ? 'success' : 'warning'}>
+            {complete ? t('protection.complete') : t('protection.incomplete')}
+          </Badge>
+        </div>
+        <div>
+          <p className="mb-1 font-semibold">
+            {t('protection.percent', { percent: protection.percent })}
+          </p>
+          <div
+            role="progressbar"
+            aria-label={t('protection.title')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={protection.percent}
+            className="h-3 w-full overflow-hidden rounded-full bg-surface"
+          >
+            <div
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${protection.percent}%` }}
+            />
+          </div>
+        </div>
+        <ol className="flex flex-col gap-2">
+          {steps.map((s) => (
+            <li key={s.key} className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <span aria-hidden="true">{s.done ? '✓' : '○'} </span>
+                {s.label}
+                <span className="sr-only">
+                  : {s.done ? t('protection.done') : t('protection.todo')}
+                </span>
+              </span>
+              {!s.done && s.href && (
+                <Link href={s.href} className="text-primary underline">
+                  {s.go}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ol>
+      </Stack>
+    </Card>
+  );
+}
+
+function SummarySettings({ initial }: { initial: Me['summaryFrequency'] }) {
+  const { t } = useI18n();
+  const [value, setValue] = useState(initial);
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function save(next: Me['summaryFrequency']) {
+    setValue(next);
+    setStatus(null);
+    try {
+      await api('/v1/me', { method: 'PATCH', body: { summaryFrequency: next } });
+      setStatus(t('summarySettings.saved'));
+    } catch (err) {
+      setStatus(errorText(err, t));
+    }
+  }
+
+  return (
+    <Card>
+      <Stack gap={3}>
+        <Heading level={2} className="text-xl">
+          {t('summarySettings.title')}
+        </Heading>
+        <Text>{t('summarySettings.intro')}</Text>
+        <Field label={t('summarySettings.label')}>
+          {({ id }) => (
+            <Select
+              id={id}
+              className="max-w-xs"
+              value={value}
+              onChange={(e) => void save(e.target.value as Me['summaryFrequency'])}
+            >
+              <option value="monthly">{t('summarySettings.monthly')}</option>
+              <option value="weekly">{t('summarySettings.weekly')}</option>
+              <option value="off">{t('summarySettings.off')}</option>
+            </Select>
+          )}
+        </Field>
+        <p role="status" className="text-sm text-muted">
+          {status}
+        </p>
+      </Stack>
+    </Card>
   );
 }
 

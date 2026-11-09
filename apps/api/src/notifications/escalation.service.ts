@@ -52,8 +52,15 @@ export class EscalationService {
     isTest: boolean;
   }): Promise<Date | null> {
     if (input.isTest || !input.escalates) return null;
-    if (!(await this.hasContact(input.ownerId, input.vehicleId))) return null;
-    const minutes = Number(await this.settings.get('escalation.default_minutes', 7));
+    if (!input.ownerId || !(await this.hasContact(input.ownerId, input.vehicleId))) return null;
+    // OW-07: the owner's own delay (3–30 min), else the default from settings.
+    const owner = await this.db
+      .selectFrom('users')
+      .select('escalation_minutes')
+      .where('id', '=', input.ownerId)
+      .executeTakeFirst();
+    const minutes =
+      owner?.escalation_minutes ?? Number(await this.settings.get('escalation.default_minutes', 7));
     return new Date(Date.now() + minutes * 60_000);
   }
 

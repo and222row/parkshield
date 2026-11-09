@@ -10,7 +10,9 @@ import { CRYPTO, DB, ENV, LOGGER } from '../core/tokens';
 import type { ChannelType } from '../db/types.generated';
 import { MailService } from '../mail/mail.service';
 import { PUSH, WHATSAPP, type PushSender, type WhatsAppSender } from '../providers/ports';
+import { PreferencesService } from '../preferences/preferences.service';
 import { AckService, OWNER_REPLIES, type ReplyLinks } from './ack.service';
+import { FairUseService } from './fair-use.service';
 import { channelOrder, type OrderableChannel } from './channel-order';
 import { pushText, REPLY_LABELS, REPLY_SENT, type PushKind } from './push-texts';
 
@@ -56,6 +58,8 @@ export class DispatchService {
     @Inject(WHATSAPP) private readonly whatsapp: WhatsAppSender,
     @Inject(LOGGER) private readonly logger: Logger,
     @Inject(AckService) private readonly ack: AckService,
+    @Inject(PreferencesService) private readonly preferences: PreferencesService,
+    @Inject(FairUseService) private readonly fairUse: FairUseService,
   ) {}
 
   private load(alertId: string) {
@@ -73,6 +77,7 @@ export class DispatchService {
         'a.expires_at',
         'a.followup_sent_at',
         'a.scanner_waiting_at',
+        'a.vehicle_id',
         'v.nickname',
         'u.id as userId',
         'u.email',
@@ -88,6 +93,34 @@ export class DispatchService {
     const alert = await this.load(alertId);
     if (!alert || !['dispatched', 'delivered'].includes(alert.status)) return;
     if (alert.expires_at < new Date()) return;
+
+    // US-26: quiet hours and "sensitive spot" mute the owner's notifications. The alert is kept and
+    // recorded as suppressed (it shows in the history); escalation to a contact still applies.
+    const muted = await this.preferences.muteReason({
+      userId: alert.userId,
+      vehicleId: alert.vehicle_id,
+      severity: alert.severity,
+      isTest: alert.is_test,
+    });
+    if (muted) {
+      const already = await this.db
+        .selectFrom('alert_deliveries')
+        .select('id')
+        .where('alert_id', '=', alert.id)
+        .where('suppressed_reason', '=', muted)
+        .executeTakeFirst();
+      if (!already) {
+        const [first] = await channelOrder(this.db, this.settings, alert.userId);
+        await this.record({
+          alertId: alert.id,
+          channel: first ?? 'email',
+          provider: 'none',
+          status: 'suppressed',
+          reason: muted,
+        });
+      }
+      return;
+    }
 
     const token = await this.ack.tokenFor(alert.id, alert.expires_at);
     const msg: Message = {
@@ -423,6 +456,18 @@ export class DispatchService {
       });
       return 'suppressed';
     }
+    // US-27: above the monthly fair-use limit, skip WhatsApp; the alert falls through to Push and e-mail.
+    const owner = { id: alert.userId, email: alert.email, lang: alert.preferred_lang };
+    if (!(await this.fairUse.reserve(owner, 'whatsapp'))) {
+      await this.record({
+        alertId: alert.id,
+        channel: 'whatsapp',
+        provider,
+        status: 'suppressed',
+        reason: 'fair_use',
+      });
+      return 'suppressed';
+    }
     const cost = Number(await this.settings.get('whatsapp.cost_micros', 55_000));
     const delivery = await this.record({
       alertId: alert.id,
@@ -446,6 +491,7 @@ export class DispatchService {
       return 'sent';
     } catch (err) {
       await this.finish(delivery.id, { ok: false, error: String(err) });
+      await this.fairUse.release(alert.userId, 'whatsapp');
       throw err;
     }
   }
