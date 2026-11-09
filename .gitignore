@@ -1,10 +1,12 @@
 node_modules/
 dist/
 .next/
+.next-*/
 .turbo/
 coverage/
 *.tsbuildinfo
 next-env.d.ts
+apps/web/public/scanner-assets/
 
 # local runtime data (embedded PostgreSQL, uploads, backups)
 .local/

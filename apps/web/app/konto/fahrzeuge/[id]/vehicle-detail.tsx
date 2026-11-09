@@ -2,6 +2,7 @@
 
 import type { MessageKey } from '@parkshield/i18n';
 import {
+  ADDON_PRICES_CENTS,
   CTA_MAX,
   CTA_SUGGESTIONS,
   DECAL_PRODUCTS,
@@ -17,6 +18,7 @@ import {
   Heading,
   Input,
   Notice,
+  Select,
   Stack,
   Text,
   useI18n,
@@ -200,12 +202,23 @@ function Designer({ vehicle, onSaved }: { vehicle: Vehicle; onSaved: (v: Vehicle
   );
 }
 
-function IncludedOrder({
-  vehicleId,
-  onOrdered,
+type Address = {
+  name: string;
+  line1: string;
+  line2?: string;
+  postalCode: string;
+  city: string;
+  country: 'DE';
+};
+
+function AddressForm({
+  intro,
+  submitLabel,
+  onSubmit,
 }: {
-  vehicleId: string;
-  onOrdered: (o: OrderSummary) => void;
+  intro: string;
+  submitLabel: string;
+  onSubmit: (address: Address) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [a, setA] = useState({ name: '', line1: '', line2: '', postalCode: '', city: '' });
@@ -219,10 +232,7 @@ function IncludedOrder({
     setBusy(true);
     setError(null);
     try {
-      const address = { ...a, line2: a.line2 || undefined, country: 'DE' };
-      onOrdered(
-        await api<OrderSummary>(`/v1/vehicles/${vehicleId}/order-included`, { body: { address } }),
-      );
+      await onSubmit({ ...a, line2: a.line2 || undefined, country: 'DE' });
     } catch (err) {
       setError(errorText(err, t));
     } finally {
@@ -232,7 +242,7 @@ function IncludedOrder({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Text>{t('order.includedIntro')}</Text>
+      <Text>{intro}</Text>
       <Field label={t('order.name')}>
         {({ id }) => (
           <Input id={id} required autoComplete="name" value={a.name} onChange={set('name')} />
@@ -285,9 +295,134 @@ function IncludedOrder({
       </Text>
       {error && <Notice tone="danger">{error}</Notice>}
       <Button type="submit" busy={busy} className="w-fit">
-        {t('order.submit')}
+        {submitLabel}
       </Button>
     </form>
+  );
+}
+
+const euro = (cents: number, locale: string) =>
+  new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(cents / 100);
+
+function DecalTest({ vehicle }: { vehicle: Vehicle }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState<{ until: string; scanUrl: string } | null>(null);
+  const lastTest = vehicle.decal?.lastTestAt;
+
+  async function start() {
+    setOpen(
+      await api<{ until: string; scanUrl: string }>(`/v1/vehicles/${vehicle.id}/test-window`, {
+        body: {},
+      }),
+    );
+  }
+
+  return (
+    <Card>
+      <Stack gap={3}>
+        <Heading level={2} className="text-xl">
+          {t('decalTest.title')}
+        </Heading>
+        <Text>{t('decalTest.intro')}</Text>
+        <Text muted>
+          {lastTest ? t('decalTest.lastTest', { date: new Date(lastTest) }) : t('decalTest.never')}
+        </Text>
+        {open ? (
+          <>
+            <Notice tone="info">{t('decalTest.open', { time: new Date(open.until) })}</Notice>
+            <a
+              href={open.scanUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="w-fit font-semibold text-primary underline"
+            >
+              {t('decalTest.openHere')}
+            </a>
+          </>
+        ) : (
+          <Button onClick={start} className="w-fit">
+            {t('decalTest.button')}
+          </Button>
+        )}
+      </Stack>
+    </Card>
+  );
+}
+
+const REASONS = ['leaked', 'car_sold', 'damaged', 'other'] as const;
+
+function RevokeAndReplace({
+  vehicle,
+  onReissued,
+  orderResult,
+}: {
+  vehicle: Vehicle;
+  onReissued: (v: Vehicle) => void;
+  orderResult?: 'paid' | 'canceled';
+}) {
+  const { t, locale } = useI18n();
+  const [reason, setReason] = useState<(typeof REASONS)[number]>('leaked');
+  const [done, setDone] = useState(false);
+  const price = euro(ADDON_PRICES_CENTS.replacementDecal, locale);
+
+  async function revoke() {
+    if (!window.confirm(t('revoke.confirm'))) return;
+    onReissued(
+      await api<Vehicle>(`/v1/vehicles/${vehicle.id}/tokens`, { body: { confirm: true, reason } }),
+    );
+    setDone(true);
+  }
+
+  return (
+    <Card>
+      <Stack gap={6}>
+        <Stack gap={3}>
+          <Heading level={2} className="text-xl">
+            {t('revoke.title')}
+          </Heading>
+          <Text>{t('revoke.intro')}</Text>
+          {done && <Notice tone="success">{t('revoke.done')}</Notice>}
+          <Field label={t('revoke.reason')}>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={reason}
+                onChange={(e) => setReason(e.target.value as typeof reason)}
+              >
+                {REASONS.map((r) => (
+                  <option key={r} value={r}>
+                    {t(`revoke.reason_${r}` as MessageKey)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Button variant="danger" onClick={revoke} className="w-fit">
+            {t('revoke.button')}
+          </Button>
+        </Stack>
+        <Stack gap={3}>
+          <Heading level={3}>{t('replacement.title')}</Heading>
+          {orderResult === 'paid' && <Notice tone="success">{t('replacement.paid')}</Notice>}
+          {orderResult === 'canceled' && (
+            <Notice tone="warning">{t('replacement.canceled')}</Notice>
+          )}
+          <AddressForm
+            intro={t('replacement.intro', { price })}
+            submitLabel={t('replacement.submit', { price })}
+            onSubmit={async (address) => {
+              const { url } = await api<{ url: string }>(
+                `/v1/vehicles/${vehicle.id}/order-replacement`,
+                {
+                  body: { address },
+                },
+              );
+              window.location.assign(url);
+            }}
+          />
+        </Stack>
+      </Stack>
+    </Card>
   );
 }
 
@@ -295,10 +430,12 @@ export function VehicleDetail({
   vehicle: initial,
   orders: initialOrders,
   includedAvailable,
+  orderResult,
 }: {
   vehicle: Vehicle;
   orders: OrderSummary[];
   includedAvailable: boolean;
+  orderResult?: 'paid' | 'canceled';
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -328,7 +465,10 @@ export function VehicleDetail({
             </Heading>
           </div>
 
-          {vehicle.decal && <Designer vehicle={vehicle} onSaved={setVehicle} />}
+          {vehicle.decal && <DecalTest key={vehicle.decal.tokenId} vehicle={vehicle} />}
+          {vehicle.decal && (
+            <Designer key={`d-${vehicle.decal.tokenId}`} vehicle={vehicle} onSaved={setVehicle} />
+          )}
 
           <Card>
             <Stack gap={4}>
@@ -337,9 +477,13 @@ export function VehicleDetail({
               </Heading>
               {justOrdered && <Notice tone="success">{t('order.submitted')}</Notice>}
               {canOrder ? (
-                <IncludedOrder
-                  vehicleId={vehicle.id}
-                  onOrdered={(o) => {
+                <AddressForm
+                  intro={t('order.includedIntro')}
+                  submitLabel={t('order.submit')}
+                  onSubmit={async (address) => {
+                    const o = await api<OrderSummary>(`/v1/vehicles/${vehicle.id}/order-included`, {
+                      body: { address },
+                    });
                     setOrders((list) => [o, ...list]);
                     setCanOrder(false);
                     setJustOrdered(true);
@@ -368,6 +512,10 @@ export function VehicleDetail({
               )}
             </Stack>
           </Card>
+
+          {vehicle.decal && (
+            <RevokeAndReplace vehicle={vehicle} onReissued={setVehicle} orderResult={orderResult} />
+          )}
 
           <Card>
             <Stack gap={4}>

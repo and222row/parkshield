@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Expects the stack to be running (`npm run dev` locally; CI starts the built apps first).
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './global-setup.ts',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

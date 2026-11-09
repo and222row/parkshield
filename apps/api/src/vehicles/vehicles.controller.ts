@@ -45,6 +45,11 @@ const Design = z.object({
   template: z.enum(DECAL_TEMPLATES),
   cta: z.string().trim().min(1).max(CTA_MAX),
 });
+const Reissue = z.object({
+  // "Explicit confirmation" (02-architecture §10): the client must state that the old decal stops working.
+  confirm: z.literal(true),
+  reason: z.enum(['leaked', 'car_sold', 'damaged', 'other']).default('other'),
+});
 const Preview = Design.partial().extend({
   product: z.enum(DECAL_PRODUCTS).default('uv_vinyl_sticker'),
 });
@@ -95,6 +100,25 @@ export class VehiclesController {
   async remove(@CurrentUser() user: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     await this.vehicles.remove(user.userId, id);
     return { ok: true };
+  }
+
+  /** US-13: revoke the current code and issue a new one (02-architecture §10). */
+  @Post(':id/tokens')
+  reissue(
+    @CurrentUser() user: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(Reissue)) body: z.infer<typeof Reissue>,
+  ) {
+    return this.vehicles.revokeAndReissue(user.userId, id, body.reason);
+  }
+
+  /** US-12: "Aufkleber testen". */
+  @Post(':id/test-window')
+  @HttpCode(200)
+  async testWindow(@CurrentUser() user: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    const { until, code } = await this.vehicles.openTestWindow(user.userId, id);
+    // The owner's own decal URL, so they can also open the test on this device.
+    return { until, scanUrl: `${this.env.SCANNER_BASE_URL}/s/${code}` };
   }
 
   @Put(':id/decal')

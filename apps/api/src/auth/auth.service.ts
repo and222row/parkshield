@@ -38,8 +38,8 @@ export class AuthService {
       throw new BadRequestException({ error: 'captcha_failed' });
     }
     const email = normalizeEmail(input.email);
-    await this.limits.enforce(`magic:ip:${input.ipPrefix}`, 30, 3600);
-    await this.limits.enforce(`magic:email:${sha256(email).toString('hex')}`, 5, 3600);
+    await this.limits.enforce('magic_link.ip', input.ipPrefix);
+    await this.limits.enforce('magic_link.email', sha256(email).toString('hex'));
 
     await this.db
       .insertInto('users')

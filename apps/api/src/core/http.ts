@@ -11,7 +11,9 @@ export async function createHttpApp(
 ): Promise<NestFastifyApplication> {
   const adapter = new FastifyAdapter({
     loggerInstance: logger,
-    trustProxy: true,
+    // Only Caddy and the Next.js server (loopback / private network) may set X-Forwarded-For;
+    // a client-supplied header must never decide the IP used for rate limits.
+    trustProxy: ['127.0.0.1', '::1', '10.0.0.0/8'],
     genReqId: () => randomUUID(),
     bodyLimit: 64 * 1024,
   });

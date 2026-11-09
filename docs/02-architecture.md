@@ -286,7 +286,7 @@ parkshield/
 | `POST /v1/auth/passkey/*` | Passkey registration and login | WebAuthn |
 | `GET/POST/PATCH /v1/vehicles` | Manage vehicles | Owner session |
 | `POST /v1/vehicles/:id/tokens` | Issue or revoke a code | Session + extra confirmation |
-| `POST /v1/tokens/:id/test-window` *(new)* | "Aufkleber testen": next scan within 10 min is a test (US-12) | Owner session |
+| `POST /v1/vehicles/:id/test-window` *(new)* | "Aufkleber testen": next scan within 10 min is a test (US-12) | Owner session |
 | `POST/DELETE /v1/vehicles/:id/modes` *(new)* | Temporary modes | Owner session |
 | `GET /v1/me/protection` *(new)* | Protection score | Owner session |
 | `GET /v1/me/deliveries` *(new)* | "I didn't get the alert" page | Owner session |

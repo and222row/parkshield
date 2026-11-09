@@ -13,6 +13,8 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // A production build next to a running `next dev` must not share its folder (HMR hash mismatch loop).
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   output: 'standalone',
   outputFileTracingRoot: join(import.meta.dirname, '..', '..'),
   transpilePackages: ['@parkshield/ui'],

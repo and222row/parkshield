@@ -18,7 +18,7 @@ import type { Db } from '../core/core.module';
 import { DB, VALKEY } from '../core/tokens';
 import { OrdersService } from '../orders/orders.service';
 import { ZodPipe } from '../core/zod.pipe';
-import type { FakePayments } from '../providers/fake-payments';
+import type { FakePayments, FakeSession } from '../providers/fake-payments';
 import { DEV_MAILBOX_KEY } from '../providers/mailer';
 import { simplePdf } from '../providers/pdf';
 import { PAYMENTS } from '../providers/ports';
@@ -47,15 +47,23 @@ export class DevController {
     return { mails: rows.map((r) => JSON.parse(r) as unknown) };
   }
 
+  private amount(s: FakeSession) {
+    return s.kind === 'payment'
+      ? Promise.resolve(s.amountCents)
+      : this.billing.priceFor(s.plan, s.metadata.promoCodeId);
+  }
+
   @Get('payments/sessions/:id')
   async session(@Param('id') id: string) {
     const s = await this.payments.getSession(id);
     if (!s) throw new NotFoundException();
-    const amountCents = await this.billing.priceFor(s.plan, s.metadata.promoCodeId);
     return {
       id: s.id,
-      plan: s.plan,
-      amountCents,
+      title:
+        s.kind === 'payment'
+          ? s.description
+          : `ParkShield ${s.plan === 'plus' ? 'Plus' : 'Premium'}`,
+      amountCents: await this.amount(s),
       cancelUrl: s.cancelUrl,
       successUrl: s.successUrl,
     };
@@ -66,7 +74,7 @@ export class DevController {
   async complete(@Body(new ZodPipe(Complete)) body: z.infer<typeof Complete>) {
     const s = await this.payments.getSession(body.sessionId);
     if (!s) throw new NotFoundException();
-    const amount = await this.billing.priceFor(s.plan, s.metadata.promoCodeId);
+    const amount = await this.amount(s);
     const event = await this.payments.complete(body.sessionId, amount);
     if (!event) throw new NotFoundException();
     await this.billing.handle(event);

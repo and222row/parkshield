@@ -50,6 +50,7 @@ export interface Vehicle {
     template: DecalTemplate;
     activatedAt: string | null;
     lastTestAt: string | null;
+    testWindowUntil: string | null;
   } | null;
 }
 

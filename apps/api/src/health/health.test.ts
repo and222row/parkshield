@@ -73,10 +73,18 @@ describe('request logging (no personal data in logs)', () => {
       headers: { 'user-agent': 'Mozilla/5.0 Unique-UA', cookie: 'sid=abc123' },
     });
     const log = lines.join('');
-    expect(log).toContain('"route":"[unmatched]"');
+    expect(log).toContain('"route":"/v1/scan/:code"'); // the pattern, never the decal code itself
     for (const secret of ['K7QX4M2R9T', 'secret-ack-token', '203.0.113', 'Unique-UA', 'abc123']) {
       expect(log).not.toContain(secret);
     }
+  });
+
+  it('logs unknown URLs as unmatched without their path', async () => {
+    lines.length = 0;
+    await pub.inject({ method: 'GET', url: '/v1/ack/Zm9vYmFyLXNlY3JldA' });
+    const log = lines.join('');
+    expect(log).toContain('"route":"[unmatched]"');
+    expect(log).not.toContain('Zm9vYmFyLXNlY3JldA');
   });
 
   it('logs the route pattern for matched routes', async () => {

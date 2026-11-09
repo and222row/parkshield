@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import type { Redis } from 'ioredis';
+import { SettingsService } from './settings.service';
 import { VALKEY } from './tokens';
 
 // One atomic step: increment, start the window on the first hit, and undo the increment when over the
@@ -16,6 +17,18 @@ end
 return {1, tonumber(ARGV[1]) - n}
 `;
 
+/** Named limits with their defaults. Runtime values come from app_settings key `ratelimit.<name>`. */
+export const RATE_LIMITS = {
+  'magic_link.ip': { max: 30, windowSeconds: 3600 },
+  'magic_link.email': { max: 5, windowSeconds: 3600 },
+  'cancel.ip': { max: 10, windowSeconds: 3600 },
+  'cancel.email': { max: 5, windowSeconds: 3600 },
+  'waitlist.ip': { max: 10, windowSeconds: 3600 },
+  'waitlist.email': { max: 3, windowSeconds: 86_400 },
+  'scan.not_found': { max: 30, windowSeconds: 60 },
+} as const;
+export type RateLimitName = keyof typeof RATE_LIMITS;
+
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
@@ -30,7 +43,10 @@ export class RateLimitedException extends HttpException {
 
 @Injectable()
 export class RateLimitService {
-  constructor(@Inject(VALKEY) private readonly valkey: Redis) {}
+  constructor(
+    @Inject(VALKEY) private readonly valkey: Redis,
+    @Inject(SettingsService) private readonly settings: SettingsService,
+  ) {}
 
   async hit(key: string, max: number, windowSeconds: number): Promise<RateLimitResult> {
     const [ok, n] = (await this.valkey.eval(SCRIPT, 1, `rl:${key}`, max, windowSeconds)) as [
@@ -42,8 +58,10 @@ export class RateLimitService {
       : { allowed: false, remaining: 0, retryAfterSeconds: n };
   }
 
-  async enforce(key: string, max: number, windowSeconds: number): Promise<void> {
-    const r = await this.hit(key, max, windowSeconds);
+  /** Enforces a named limit (hard rule 6: values come from app_settings, defaults above). */
+  async enforce(name: RateLimitName, subject: string): Promise<void> {
+    const { max, windowSeconds } = await this.settings.get(`ratelimit.${name}`, RATE_LIMITS[name]);
+    const r = await this.hit(`${name}:${subject}`, max, windowSeconds);
     if (!r.allowed) throw new RateLimitedException(r.retryAfterSeconds);
   }
 }

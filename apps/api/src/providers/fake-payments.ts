@@ -1,13 +1,19 @@
 import type { Redis } from 'ioredis';
 import { randomToken } from '../core/crypto';
-import type { BillingEvent, CheckoutRequest, Invoice, Payments } from './ports';
+import type {
+  BillingEvent,
+  CheckoutRequest,
+  Invoice,
+  PaymentCheckoutRequest,
+  Payments,
+} from './ports';
 
 const key = (...parts: string[]) => `dev:payments:${parts.join(':')}`;
 const DAY = 86_400_000;
 
-interface FakeSession extends CheckoutRequest {
-  id: string;
-}
+export type FakeSession =
+  | (CheckoutRequest & { id: string; kind: 'subscription' })
+  | (PaymentCheckoutRequest & { id: string; kind: 'payment' });
 
 /**
  * Local stand-in for Stripe while STRIPE_SECRET_KEY is empty. State lives in Valkey so it survives API
@@ -24,10 +30,20 @@ export class FakePayments implements Payments {
     return `cus_fake_${randomToken(9)}`;
   }
 
-  async createCheckout(req: CheckoutRequest): Promise<{ id: string; url: string }> {
-    const id = `cs_fake_${randomToken(12)}`;
-    await this.valkey.set(key('session', id), JSON.stringify({ ...req, id }), 'EX', 3600);
-    return { id, url: `${this.webBaseUrl}/dev/checkout?session=${encodeURIComponent(id)}` };
+  private async store(session: FakeSession): Promise<{ id: string; url: string }> {
+    await this.valkey.set(key('session', session.id), JSON.stringify(session), 'EX', 3600);
+    return {
+      id: session.id,
+      url: `${this.webBaseUrl}/dev/checkout?session=${encodeURIComponent(session.id)}`,
+    };
+  }
+
+  createCheckout(req: CheckoutRequest) {
+    return this.store({ ...req, id: `cs_fake_${randomToken(12)}`, kind: 'subscription' });
+  }
+
+  createPaymentCheckout(req: PaymentCheckoutRequest) {
+    return this.store({ ...req, id: `cs_fake_${randomToken(12)}`, kind: 'payment' });
   }
 
   async getSession(id: string): Promise<FakeSession | null> {
@@ -35,13 +51,12 @@ export class FakePayments implements Payments {
     return raw ? (JSON.parse(raw) as FakeSession) : null;
   }
 
-  /** Simulates a successful payment: subscription for one year plus a PDF invoice. */
+  /** Simulates a successful payment, with a PDF invoice. */
   async complete(sessionId: string, amountCents: number): Promise<BillingEvent | null> {
     const session = await this.getSession(sessionId);
     if (!session) return null;
     await this.valkey.del(key('session', sessionId));
     const now = new Date();
-    const subscriptionId = `sub_fake_${randomToken(9)}`;
     const invoice: Invoice = {
       id: `in_fake_${randomToken(9)}`,
       number: `DEV-${now.getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`,
@@ -50,11 +65,20 @@ export class FakePayments implements Payments {
       pdfUrl: null,
     };
     await this.valkey.lpush(key('invoices', session.customerId), JSON.stringify(invoice));
+    const eventId = `evt_fake_${randomToken(9)}`;
+    if (session.kind === 'payment') {
+      return {
+        kind: 'payment_completed',
+        eventId,
+        paymentIntentId: `pi_fake_${randomToken(9)}`,
+        metadata: session.metadata,
+      };
+    }
     return {
       kind: 'checkout_completed',
-      eventId: `evt_fake_${randomToken(9)}`,
+      eventId,
       customerId: session.customerId,
-      subscriptionId,
+      subscriptionId: `sub_fake_${randomToken(9)}`,
       metadata: session.metadata,
       periodStart: now,
       periodEnd: new Date(now.getTime() + 365 * DAY),

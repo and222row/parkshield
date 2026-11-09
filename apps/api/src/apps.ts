@@ -25,6 +25,10 @@ import { OrdersService } from './orders/orders.service';
 import { TokensService } from './vehicles/tokens.service';
 import { VehiclesController } from './vehicles/vehicles.controller';
 import { VehiclesService } from './vehicles/vehicles.service';
+import { DispatchService } from './notifications/dispatch.service';
+import { ScanController } from './scan/scan.controller';
+import { ScanService } from './scan/scan.service';
+import { ScannerRefService } from './scan/scanner-ref.service';
 import { WaitlistController } from './waitlist/waitlist.controller';
 import { OutboxService } from './worker/outbox.service';
 import { SchedulerService } from './worker/scheduler.service';
@@ -37,6 +41,9 @@ const domainProviders = [
   TokensService,
   VehiclesService,
   OrdersService,
+  ScannerRefService,
+  ScanService,
+  DispatchService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -56,6 +63,7 @@ export class PublicAppModule {
         WaitlistController,
         VehiclesController,
         OrdersController,
+        ScanController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [

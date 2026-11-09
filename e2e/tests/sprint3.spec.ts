@@ -53,11 +53,12 @@ test('vehicle, decal design, home PDF, included order, printing and tracking (US
   expect((await download).suggestedFilename()).toBe('parkshield-aufkleber.pdf');
 
   // Included decal: one order, printed by the worker, shipped with tracking.
-  await page.getByLabel('Name', { exact: true }).fill('Jonas Beispiel');
-  await page.getByLabel('Straße und Hausnummer').fill('Domstraße 1');
-  await page.getByLabel('Postleitzahl').fill('50667');
-  await page.getByLabel('Ort').fill('Köln');
-  await page.getByRole('button', { name: 'Inklusive Aufkleber bestellen' }).click();
+  const included = page.locator('form').filter({ hasText: 'Inklusive Aufkleber bestellen' });
+  await included.getByLabel('Name', { exact: true }).fill('Jonas Beispiel');
+  await included.getByLabel('Straße und Hausnummer').fill('Domstraße 1');
+  await included.getByLabel('Postleitzahl').fill('50667');
+  await included.getByLabel('Ort').fill('Köln');
+  await included.getByRole('button', { name: 'Inklusive Aufkleber bestellen' }).click();
   await expect(page.getByText('Bestellt!')).toBeVisible();
   await waitForMail(request, email, 'order_received');
 

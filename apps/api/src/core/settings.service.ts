@@ -1,16 +1,35 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import type { Redis } from 'ioredis';
 import type { Db } from './core.module';
-import { DB } from './tokens';
+import { DB, VALKEY } from './tokens';
 
-const TTL_MS = 30_000; // changes take effect well within the 60 s target (NFR "Settings")
+const TTL_MS = 30_000; // safety net; changes normally arrive instantly via the channel below
+export const SETTINGS_CHANNEL = 'settings:changed';
 
-/** Runtime settings from app_settings (AD-14). Never hard-code limits or switches (hard rule 6). */
+/**
+ * Runtime settings from app_settings (AD-14). Never hard-code limits or switches (hard rule 6).
+ * Whoever changes a setting publishes on SETTINGS_CHANNEL, so every API and worker process reloads at once.
+ */
 @Injectable()
-export class SettingsService {
+export class SettingsService implements OnModuleInit, OnModuleDestroy {
   private cache = new Map<string, unknown>();
   private loadedAt = 0;
+  private subscriber: Redis | null = null;
 
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(VALKEY) private readonly valkey: Redis,
+  ) {}
+
+  async onModuleInit() {
+    this.subscriber = this.valkey.duplicate();
+    this.subscriber.on('message', () => this.invalidate());
+    await this.subscriber.subscribe(SETTINGS_CHANNEL);
+  }
+
+  async onModuleDestroy() {
+    this.subscriber?.disconnect();
+  }
 
   private async refresh(): Promise<void> {
     if (Date.now() - this.loadedAt < TTL_MS) return;
@@ -26,5 +45,11 @@ export class SettingsService {
 
   invalidate(): void {
     this.loadedAt = 0;
+  }
+
+  /** Tells every process to reload (call after writing app_settings). */
+  async broadcastChange(): Promise<void> {
+    this.invalidate();
+    await this.valkey.publish(SETTINGS_CHANNEL, '1');
   }
 }

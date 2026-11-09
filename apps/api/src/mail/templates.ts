@@ -83,6 +83,23 @@ const templates = {
       ],
       action: 'PDF herunterladen',
     },
+    alert_received: {
+      subject: '{type}: „{nickname}“',
+      lines: [
+        'Jemand hat gerade Ihren ParkShield-Aufkleber an „{nickname}“ gescannt: {type}.',
+        '{hasMessage, select, yes {Nachricht: „{message}“} other {}}',
+        'Die Person sieht, dass Ihre Warnung angekommen ist.',
+      ],
+      action: 'Zum Konto',
+    },
+    alert_test: {
+      subject: 'Test erfolgreich: „{nickname}“',
+      lines: [
+        'Ihr Aufkleber an „{nickname}“ funktioniert. So kommen Warnungen bei Ihnen an.',
+        'Tipp: Schalten Sie zusätzlich Push oder WhatsApp ein, damit Sie Warnungen sofort sehen.',
+      ],
+      action: 'Zum Konto',
+    },
     decal_shipped: {
       subject: 'Ihr Aufkleber ist unterwegs',
       lines: [
@@ -166,6 +183,23 @@ const templates = {
       ],
       action: 'Download PDF',
     },
+    alert_received: {
+      subject: '{type}: “{nickname}”',
+      lines: [
+        'Someone just scanned your ParkShield decal on “{nickname}”: {type}.',
+        '{hasMessage, select, yes {Message: “{message}”} other {}}',
+        'They can see that your alert has arrived.',
+      ],
+      action: 'Open my account',
+    },
+    alert_test: {
+      subject: 'Test successful: “{nickname}”',
+      lines: [
+        'Your decal on “{nickname}” works. This is how alerts reach you.',
+        'Tip: also turn on Push or WhatsApp so you see alerts immediately.',
+      ],
+      action: 'Open my account',
+    },
     decal_shipped: {
       subject: 'Your decal is on its way',
       lines: [
@@ -203,7 +237,7 @@ export function renderMail(
   const fmt = (s: string) =>
     String(new IntlMessageFormat(s, locale, BERLIN_FORMATS).format(values));
   const subject = fmt(src.subject);
-  const lines = src.lines.map(fmt);
+  const lines = src.lines.map(fmt).filter((l) => l.trim() !== ''); // optional lines render empty
   const action = src.action && actionUrl ? { label: fmt(src.action), url: actionUrl } : undefined;
 
   const text = [

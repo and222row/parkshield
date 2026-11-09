@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sha256 } from '../core/crypto';
+import { SettingsService } from '../core/settings.service';
 import {
   createHarness,
   linkToken,
@@ -84,6 +85,23 @@ describe('magic link sign-up and login (US-05)', () => {
     expect(sixth.statusCode).toBe(429);
     expect(sixth.json().retryAfterSeconds).toBeGreaterThan(3000);
     expect((await requestLink(h, 'other@example.de')).statusCode).toBe(202);
+  });
+
+  it('reads limits from app_settings, applied immediately (hard rule 6)', async () => {
+    await h.db
+      .insertInto('app_settings')
+      .values({
+        key: 'ratelimit.magic_link.email',
+        value: JSON.stringify({ max: 1, windowSeconds: 60 }),
+      })
+      .execute();
+    await h.app.get(SettingsService).broadcastChange();
+    expect((await requestLink(h, 'tight@example.de')).statusCode).toBe(202);
+    const second = await requestLink(h, 'tight@example.de');
+    expect(second.statusCode).toBe(429);
+    expect(second.json().retryAfterSeconds).toBeLessThanOrEqual(60);
+    await h.db.deleteFrom('app_settings').where('key', '=', 'ratelimit.magic_link.email').execute();
+    await h.app.get(SettingsService).broadcastChange();
   });
 
   it('answers identically for new and existing addresses', async () => {

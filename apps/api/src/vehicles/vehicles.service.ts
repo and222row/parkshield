@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { DecalTemplate } from '@parkshield/shared';
+import { TEST_WINDOW_MINUTES, type DecalTemplate } from '@parkshield/shared';
 import { sql } from 'kysely';
 import { EntitlementService } from '../billing/entitlements.service';
 import type { Db } from '../core/core.module';
@@ -46,6 +46,7 @@ export class VehiclesService {
               'design_template_id',
               'activated_at',
               'last_test_at',
+              'test_window_until',
             ])
             .where('status', '<>', 'revoked')
             .orderBy('vehicle_id')
@@ -67,6 +68,7 @@ export class VehiclesService {
         't.design_template_id',
         't.activated_at',
         't.last_test_at',
+        't.test_window_until',
       ])
       .where('v.owner_user_id', '=', userId);
   }
@@ -90,6 +92,10 @@ export class VehiclesService {
             template: row.design_template_id as DecalTemplate,
             activatedAt: row.activated_at,
             lastTestAt: row.last_test_at,
+            testWindowUntil:
+              row.test_window_until && row.test_window_until > new Date()
+                ? row.test_window_until
+                : null,
           }
         : null,
     };
@@ -185,6 +191,45 @@ export class VehiclesService {
       .where('id', '=', v.decal.tokenId)
       .executeTakeFirstOrThrow();
     return { vehicle: v, token: t, code: this.tokens.decrypt(t.code_enc) };
+  }
+
+  /**
+   * US-13: revoke a leaked code and issue a new one in one step. The old decal immediately shows
+   * "inactive"; the new code keeps the saved design so a replacement can be printed or downloaded.
+   */
+  async revokeAndReissue(userId: string, vehicleId: string, reason: string) {
+    const { token } = await this.currentToken(userId, vehicleId);
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .updateTable('qr_tokens')
+        .set({
+          status: 'revoked',
+          revoked_at: sql`now()`,
+          revoke_reason: reason,
+          test_window_until: null,
+        })
+        .where('id', '=', token.id)
+        .execute();
+      const fresh = await this.tokens.issue(trx, vehicleId);
+      await trx
+        .updateTable('qr_tokens')
+        .set({ cta_header: token.cta_header, design_template_id: token.design_template_id })
+        .where('id', '=', fresh.id)
+        .execute();
+    });
+    return this.get(userId, vehicleId);
+  }
+
+  /** US-12: "Aufkleber testen" — the next scan of this code within the window is the owner's test. */
+  async openTestWindow(userId: string, vehicleId: string): Promise<{ until: Date; code: string }> {
+    const { token, code } = await this.currentToken(userId, vehicleId);
+    const until = new Date(Date.now() + TEST_WINDOW_MINUTES * 60_000);
+    await this.db
+      .updateTable('qr_tokens')
+      .set({ test_window_until: until })
+      .where('id', '=', token.id)
+      .execute();
+    return { until, code };
   }
 
   async saveDesign(

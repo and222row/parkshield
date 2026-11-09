@@ -8,7 +8,7 @@ import { useBrowserValue } from '@/lib/use-browser-value';
 const readSessionId = () => new URLSearchParams(window.location.search).get('session');
 
 interface FakeSession {
-  plan: string;
+  title: string;
   amountCents: number;
   cancelUrl: string;
 }
@@ -52,8 +52,7 @@ export default function DevCheckout() {
             {session && session !== 'gone' && (
               <>
                 <Text className="text-lg font-semibold">
-                  ParkShield {session.plan === 'plus' ? 'Plus' : 'Premium'} ·{' '}
-                  {t('dev.amount', { amount: euro(session.amountCents) })}
+                  {session.title} · {t('dev.amount', { amount: euro(session.amountCents) })}
                 </Text>
                 <Button size="lg" onClick={pay} busy={busy}>
                   {t('dev.pay')}

@@ -14,6 +14,9 @@ const values = {
   nextAttemptAt: new Date('2028-08-06T00:00:00Z'),
   nickname: 'Der Blaue',
   trackingNumber: '00340434161234567890',
+  type: 'Fahrzeug versperrt Ausfahrt',
+  hasMessage: 'yes',
+  message: 'Stehe in der Einfahrt',
 };
 
 describe('mail templates', () => {

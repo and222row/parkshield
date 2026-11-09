@@ -1,5 +1,12 @@
 import Stripe from 'stripe';
-import type { BillingEvent, CheckoutRequest, Invoice, PaidPlan, Payments } from './ports';
+import type {
+  BillingEvent,
+  CheckoutRequest,
+  Invoice,
+  PaidPlan,
+  PaymentCheckoutRequest,
+  Payments,
+} from './ports';
 
 type SubStatus = Extract<BillingEvent, { kind: 'subscription_updated' }>['status'];
 
@@ -75,6 +82,34 @@ export class StripePayments implements Payments {
     return { id: session.id, url: session.url };
   }
 
+  async createPaymentCheckout(req: PaymentCheckoutRequest): Promise<{ id: string; url: string }> {
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: req.customerId,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'eur',
+            unit_amount: req.amountCents,
+            tax_behavior: 'inclusive', // consumer prices include VAT (PAngV)
+            product_data: { name: req.description },
+          },
+        },
+      ],
+      invoice_creation: { enabled: true },
+      automatic_tax: { enabled: true },
+      customer_update: { address: 'auto', name: 'auto' },
+      locale: req.locale,
+      success_url: req.successUrl,
+      cancel_url: req.cancelUrl,
+      metadata: req.metadata,
+      payment_intent_data: { metadata: req.metadata },
+    });
+    if (!session.url) throw new Error('Stripe returned no checkout URL');
+    return { id: session.id, url: session.url };
+  }
+
   async cancelAt(subscriptionId: string, at: Date | null): Promise<{ periodEnd: Date | null }> {
     const sub = await this.stripe.subscriptions.update(
       subscriptionId,
@@ -110,6 +145,14 @@ export class StripePayments implements Payments {
         metadata: (obj.metadata as Record<string, string>) ?? {},
         periodStart: p.start ?? new Date(),
         periodEnd: p.end ?? new Date(),
+      };
+    }
+    if (event.type === 'checkout.session.completed' && obj.mode === 'payment') {
+      return {
+        kind: 'payment_completed',
+        eventId: event.id,
+        paymentIntentId: (obj.payment_intent as string | null) ?? null,
+        metadata: (obj.metadata as Record<string, string>) ?? {},
       };
     }
     if (event.type === 'customer.subscription.deleted') {

@@ -51,11 +51,26 @@ export async function createHarness(): Promise<Harness> {
   };
 }
 
-/** Removes everything tests create; seed rows from migrations stay. */
+let settingsSeed: { key: string; value: unknown }[] | null = null;
+
+/**
+ * Removes everything tests create. TRUNCATE … CASCADE also reaches app_settings (updated_by → users),
+ * so the seeded runtime settings are snapshotted once and put back after every reset.
+ */
 export async function resetState(h: Harness): Promise<void> {
+  settingsSeed ??= await h.db.selectFrom('app_settings').select(['key', 'value']).execute();
   await sql`TRUNCATE users, business_waitlist, promo_codes, partners, outbox_events RESTART IDENTITY CASCADE`.execute(
     h.db,
   );
+  if (settingsSeed.length) {
+    await h.db
+      .insertInto('app_settings')
+      .values(settingsSeed.map((s) => ({ key: s.key, value: JSON.stringify(s.value) })))
+      .onConflict((oc) =>
+        oc.column('key').doUpdateSet((eb) => ({ value: eb.ref('excluded.value') })),
+      )
+      .execute();
+  }
   await h.valkey.flushdb();
 }
 

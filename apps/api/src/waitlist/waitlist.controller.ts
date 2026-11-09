@@ -39,8 +39,8 @@ export class WaitlistController {
     if (!(await this.captcha.verify(body.captcha)))
       throw new BadRequestException({ error: 'captcha_failed' });
     const email = normalizeEmail(body.email);
-    await this.limits.enforce(`waitlist:ip:${truncateIp(req.ip)}`, 10, 3600);
-    await this.limits.enforce(`waitlist:email:${sha256(email).toString('hex')}`, 3, 86_400);
+    await this.limits.enforce('waitlist.ip', truncateIp(req.ip));
+    await this.limits.enforce('waitlist.email', sha256(email).toString('hex'));
 
     const token = randomToken();
     const row = await this.db

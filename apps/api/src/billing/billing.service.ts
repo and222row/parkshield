@@ -17,6 +17,7 @@ import { RateLimitService } from '../core/rate-limit.service';
 import { SettingsService } from '../core/settings.service';
 import { DB, ENV, LOGGER, VALKEY } from '../core/tokens';
 import { MailService } from '../mail/mail.service';
+import { OrdersService } from '../orders/orders.service';
 import {
   CAPTCHA,
   PAYMENTS,
@@ -73,6 +74,7 @@ export class BillingService {
     @Inject(MailService) private readonly mail: MailService,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(RateLimitService) private readonly limits: RateLimitService,
+    @Inject(OrdersService) private readonly orders: OrdersService,
   ) {}
 
   async plans() {
@@ -235,6 +237,9 @@ export class BillingService {
       if (event.kind === 'checkout_completed') await this.onCheckoutCompleted(event);
       if (event.kind === 'subscription_updated') await this.onSubscriptionUpdated(event);
       if (event.kind === 'payment_failed') await this.onPaymentFailed(event);
+      if (event.kind === 'payment_completed' && event.metadata.orderId) {
+        await this.orders.markPaid(event.metadata.orderId, event.paymentIntentId);
+      }
     } catch (err) {
       await this.valkey.del(`billing:event:${event.eventId}`);
       throw err;
@@ -395,8 +400,8 @@ export class BillingService {
       throw new BadRequestException({ error: 'captcha_failed' });
     }
     const email = normalizeEmail(input.email);
-    await this.limits.enforce(`cancel:ip:${input.ipPrefix}`, 10, 3600);
-    await this.limits.enforce(`cancel:email:${sha256(email).toString('hex')}`, 5, 3600);
+    await this.limits.enforce('cancel.ip', input.ipPrefix);
+    await this.limits.enforce('cancel.email', sha256(email).toString('hex'));
 
     const sub = await this.db
       .selectFrom('subscriptions as s')

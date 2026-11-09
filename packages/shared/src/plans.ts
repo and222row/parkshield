@@ -35,3 +35,9 @@ export const PLAN_LIMIT_DEFAULTS: Record<'plus' | 'premium', PlanLimits> = {
 /** Consumer prices in euro cents, VAT included (PAngV). */
 export const PLAN_PRICES_CENTS = { plus: 1000, premium: 1500 } as const;
 export const VAT_RATE_DE = 0.19;
+
+/** Paid add-ons, euro cents incl. VAT, shipping included (05-business §1). */
+export const ADDON_PRICES_CENTS = { replacementDecal: 590 } as const;
+
+/** Owner self-test window after "Aufkleber testen" (US-12). */
+export const TEST_WINDOW_MINUTES = 10;

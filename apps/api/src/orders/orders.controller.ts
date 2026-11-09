@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -26,6 +27,7 @@ const Address = z.object({
   country: z.literal('DE'),
 });
 const OrderIncluded = z.object({ address: Address });
+const OrderReplacement = z.object({ address: Address });
 
 @Controller('v1')
 @UseGuards(SessionGuard)
@@ -48,5 +50,16 @@ export class OrdersController {
     @Body(new ZodPipe(OrderIncluded)) body: z.infer<typeof OrderIncluded>,
   ) {
     return this.orders.orderIncluded(user.userId, vehicleId, body.address);
+  }
+
+  /** US-13: paid replacement (€5.90); returns the checkout URL. */
+  @Post('vehicles/:id/order-replacement')
+  @HttpCode(200)
+  replacement(
+    @CurrentUser() user: AuthContext,
+    @Param('id', ParseUUIDPipe) vehicleId: string,
+    @Body(new ZodPipe(OrderReplacement)) body: z.infer<typeof OrderReplacement>,
+  ) {
+    return this.orders.orderReplacement(user.userId, vehicleId, body.address, user.preferredLang);
   }
 }

@@ -55,6 +55,17 @@ export interface CheckoutRequest {
   metadata: Record<string, string>;
 }
 
+/** One-time purchase (replacement decal, add-ons). Amount is gross, VAT included. */
+export interface PaymentCheckoutRequest {
+  customerId: string;
+  amountCents: number;
+  description: string;
+  locale: 'de' | 'en';
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}
+
 export interface Invoice {
   id: string;
   number: string;
@@ -90,11 +101,18 @@ export type BillingEvent =
       attemptCount: number;
       nextAttemptAt: Date | null;
     }
+  | {
+      kind: 'payment_completed';
+      eventId: string;
+      paymentIntentId: string | null;
+      metadata: Record<string, string>;
+    }
   | { kind: 'ignored'; eventId: string; type: string };
 
 export interface Payments {
   ensureCustomer(input: { email: string; userId: string; locale: 'de' | 'en' }): Promise<string>;
   createCheckout(req: CheckoutRequest): Promise<{ id: string; url: string }>;
+  createPaymentCheckout(req: PaymentCheckoutRequest): Promise<{ id: string; url: string }>;
   /** Ends the subscription at `at`, or at the end of the current period when `at` is null. */
   cancelAt(subscriptionId: string, at: Date | null): Promise<{ periodEnd: Date | null }>;
   listInvoices(customerId: string): Promise<Invoice[]>;

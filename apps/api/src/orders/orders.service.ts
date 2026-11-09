@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { DecalTemplate } from '@parkshield/shared';
+import { ADDON_PRICES_CENTS, type DecalTemplate } from '@parkshield/shared';
 import { sql } from 'kysely';
 import { EntitlementService } from '../billing/entitlements.service';
 import type { Env } from '../config/env';
@@ -9,7 +9,13 @@ import { CRYPTO, DB, ENV } from '../core/tokens';
 import { layoutDecal } from '../decal/layout';
 import { renderPrintPdf } from '../decal/pdf';
 import { MailService } from '../mail/mail.service';
-import { PRINT, type PrintPartner, type ShippingAddress } from '../providers/ports';
+import {
+  PAYMENTS,
+  PRINT,
+  type Payments,
+  type PrintPartner,
+  type ShippingAddress,
+} from '../providers/ports';
 import { TokensService } from '../vehicles/tokens.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 
@@ -27,6 +33,7 @@ export class OrdersService {
     @Inject(TokensService) private readonly tokens: TokensService,
     @Inject(MailService) private readonly mail: MailService,
     @Inject(PRINT) private readonly printer: PrintPartner,
+    @Inject(PAYMENTS) private readonly payments: Payments,
   ) {}
 
   /** One decal is included at the first subscription only (OW-04), never again after a later re-subscription. */
@@ -94,6 +101,75 @@ export class OrdersService {
       actionUrl: `${this.env.WEB_BASE_URL}/konto/fahrzeuge/${vehicleId}`,
     });
     return this.get(userId, orderId);
+  }
+
+  /** US-13: paid replacement decal (€5.90 incl. shipping), printed only after the payment arrives. */
+  async orderReplacement(
+    userId: string,
+    vehicleId: string,
+    address: ShippingAddress,
+    locale: 'de' | 'en',
+  ) {
+    await this.entitlements.require(userId);
+    const { token } = await this.vehicles.currentToken(userId, vehicleId);
+    const user = await this.db
+      .selectFrom('users')
+      .select('stripe_customer_id')
+      .where('id', '=', userId)
+      .executeTakeFirstOrThrow();
+    if (!user.stripe_customer_id) throw new ConflictException({ error: 'no_customer' });
+    const amount = ADDON_PRICES_CENTS.replacementDecal;
+    const order = await this.db.transaction().execute(async (trx) => {
+      const o = await trx
+        .insertInto('decal_orders')
+        .values({
+          user_id: userId,
+          status: 'pending_payment',
+          shipping_address_enc: this.crypto.encrypt(JSON.stringify(address)),
+          key_version: this.crypto.keyVersion,
+          total_gross_cents: amount,
+          is_replacement: true,
+        })
+        .returning('id')
+        .executeTakeFirstOrThrow();
+      await trx
+        .insertInto('decal_order_items')
+        .values({
+          order_id: o.id,
+          qr_token_id: token.id,
+          product: 'uv_vinyl_sticker',
+          unit_gross_cents: amount,
+        })
+        .execute();
+      return o;
+    });
+    const back = `${this.env.WEB_BASE_URL}/konto/fahrzeuge/${vehicleId}`;
+    return this.payments.createPaymentCheckout({
+      customerId: user.stripe_customer_id,
+      amountCents: amount,
+      description: locale === 'en' ? 'ParkShield replacement decal' : 'ParkShield-Ersatzaufkleber',
+      locale,
+      successUrl: `${back}?order=paid`,
+      cancelUrl: `${back}?order=canceled`,
+      metadata: { orderId: order.id, userId },
+    });
+  }
+
+  /** Payment for an order arrived: queue it for printing (idempotent). */
+  async markPaid(orderId: string, paymentIntentId: string | null): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      const r = await trx
+        .updateTable('decal_orders')
+        .set({ status: 'paid', stripe_payment_intent: paymentIntentId })
+        .where('id', '=', orderId)
+        .where('status', '=', 'pending_payment')
+        .executeTakeFirst();
+      if (!Number(r.numUpdatedRows)) return;
+      await trx
+        .insertInto('outbox_events')
+        .values({ topic: PRINT_TOPIC, payload: JSON.stringify({ orderId }) })
+        .execute();
+    });
   }
 
   async list(userId: string) {
