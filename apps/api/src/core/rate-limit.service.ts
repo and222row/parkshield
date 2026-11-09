@@ -51,6 +51,8 @@ export const RATE_LIMITS = {
   'waitlist.ip': { max: 10, windowSeconds: 3600 },
   'waitlist.email': { max: 3, windowSeconds: 86_400 },
   'scan.not_found': { max: 30, windowSeconds: 60 },
+  // US-24: invitations e-mail third parties, so an account cannot be used to send many of them.
+  'contact.invite': { max: 5, windowSeconds: 86_400 },
 } as const;
 export type RateLimitName = keyof typeof RATE_LIMITS;
 

@@ -12,8 +12,15 @@ export class MailService {
     locale: MailLocale;
     values?: MailValues;
     actionUrl?: string;
+    replies?: { label: string; url: string }[];
   }): Promise<void> {
-    const rendered = renderMail(input.template, input.locale, input.values ?? {}, input.actionUrl);
+    const rendered = renderMail(
+      input.template,
+      input.locale,
+      input.values ?? {},
+      input.actionUrl,
+      input.replies,
+    );
     await this.mailer.send({ to: input.to, tag: input.template, ...rendered });
   }
 }

@@ -7,10 +7,12 @@ import type { Db } from '../core/core.module';
 import type { FieldCrypto } from '../core/crypto';
 import { SettingsService } from '../core/settings.service';
 import { CRYPTO, DB, ENV, LOGGER } from '../core/tokens';
+import type { ChannelType } from '../db/types.generated';
 import { MailService } from '../mail/mail.service';
 import { PUSH, WHATSAPP, type PushSender, type WhatsAppSender } from '../providers/ports';
-import type { ChannelType } from '../db/types.generated';
-import { pushText, type PushKind } from './push-texts';
+import { AckService, OWNER_REPLIES, type ReplyLinks } from './ack.service';
+import { channelOrder, type OrderableChannel } from './channel-order';
+import { pushText, REPLY_LABELS, REPLY_SENT, type PushKind } from './push-texts';
 
 /** NT-06: a subscription is removed after HTTP 404/410 or this many consecutive failures. */
 export const PUSH_MAX_FAILURES = 5;
@@ -18,16 +20,29 @@ const PUSH_TTL_SECONDS = 2 * 3600;
 const DONE = ['sent', 'delivered', 'read'] as const;
 
 type AlertRow = NonNullable<Awaited<ReturnType<DispatchService['load']>>>;
-type Outcome = 'sent' | 'failed' | 'suppressed' | 'skipped';
+/** sent: delivered to the provider now; already: in an earlier attempt; unavailable: not set up. */
+type Outcome = 'sent' | 'already' | 'failed' | 'suppressed' | 'unavailable';
+type Kind = 'alert' | 'test' | 'followup';
+
+interface Message {
+  kind: Kind;
+  token: string;
+  links: ReplyLinks;
+  /** false for reminders: they are sent again on purpose, so earlier deliveries do not count. */
+  dedupe: boolean;
+}
+
+/** Order for the NT-09 reminder: fastest first, regardless of cost. */
+const FASTEST: OrderableChannel[] = ['webpush', 'whatsapp', 'email'];
 
 /**
- * Delivers an alert to the owner on every enabled channel: e-mail (always), each Web Push device
- * (US-20) and WhatsApp when linked (US-21). Kill switches (NT-12) suppress a channel at once.
- * Channel priority and "stop at first success" for normal alerts follow with US-22.
+ * Delivers an alert to the owner (US-22, NT-01). Normal alerts go through the owner's channel order
+ * (cheapest first by default) and stop at the first channel that worked; on failure the next one is
+ * tried. Urgent alerts and tests go to every enabled channel at once. Kill switches (NT-12) suppress a
+ * channel and move on. Every notification carries the reply buttons (NT-02, OW-16).
  *
- * Idempotent: a replayed outbox event never notifies a channel (or push device) twice.
- * E-mail and WhatsApp errors are rethrown so the outbox retries; push errors are not,
- * because they are counted per device (NT-06) and retrying would double-count.
+ * Idempotent: a replayed outbox event never notifies a channel (or push device) twice. When nothing
+ * could be delivered, the error is rethrown so the outbox retries with backoff.
  */
 @Injectable()
 export class DispatchService {
@@ -40,6 +55,7 @@ export class DispatchService {
     @Inject(PUSH) private readonly push: PushSender,
     @Inject(WHATSAPP) private readonly whatsapp: WhatsAppSender,
     @Inject(LOGGER) private readonly logger: Logger,
+    @Inject(AckService) private readonly ack: AckService,
   ) {}
 
   private load(alertId: string) {
@@ -70,27 +86,19 @@ export class DispatchService {
 
   async dispatch(alertId: string): Promise<void> {
     const alert = await this.load(alertId);
-    if (
-      !alert ||
-      !['dispatched', 'delivered'].includes(alert.status) ||
-      alert.expires_at < new Date()
-    )
-      return;
+    if (!alert || !['dispatched', 'delivered'].includes(alert.status)) return;
+    if (alert.expires_at < new Date()) return;
 
-    const errors: unknown[] = [];
-    const run = async (fn: () => Promise<Outcome>) => {
-      try {
-        return await fn();
-      } catch (err) {
-        errors.push(err);
-        return 'failed' as const;
-      }
+    const token = await this.ack.tokenFor(alert.id, alert.expires_at);
+    const msg: Message = {
+      kind: alert.is_test ? 'test' : 'alert',
+      token,
+      links: this.ack.links(token),
+      dedupe: true,
     };
-    const outcomes = [
-      await run(() => this.sendEmail(alert, alert.is_test ? 'alert_test' : 'alert_received')),
-      ...(await this.sendPushAll(alert, alert.is_test ? 'test' : 'alert')),
-      await run(() => this.sendWhatsApp(alert, alert.is_test ? 'ps_test' : 'ps_alert')),
-    ];
+    const everywhere = alert.severity === 'urgent' || alert.is_test;
+    const order = await channelOrder(this.db, this.settings, alert.userId);
+    const { outcomes, errors } = await this.deliver(alert, msg, order, everywhere);
 
     if (outcomes.includes('sent')) {
       await this.db
@@ -100,33 +108,59 @@ export class DispatchService {
         .where('status', '=', 'dispatched')
         .execute();
     }
-    if (errors.length) throw errors[0]; // the outbox retries; channels already sent are skipped
+    const reached = outcomes.some((o) => o === 'sent' || o === 'already');
+    // Retry when nothing reached the owner, or (urgent) when one channel still has to be retried.
+    if (errors.length && (everywhere || !reached)) throw errors[0];
+    if (!reached && !errors.length) {
+      this.logger.warn(
+        { outcomes },
+        'alert not delivered: every channel switched off or unavailable',
+      );
+    }
   }
 
-  /** NT-09: one reminder on the fastest channel (Push, otherwise WhatsApp, otherwise e-mail). */
+  /** NT-09: one reminder with fresh reply buttons on the fastest channel that works. */
   async followup(alertId: string): Promise<void> {
     const alert = await this.load(alertId);
-    if (
-      !alert ||
-      alert.followup_sent_at ||
-      !alert.scanner_waiting_at ||
-      alert.status !== 'acknowledged'
-    )
-      return;
-    const pushed = (await this.sendPushAll(alert, 'followup', { dedupe: false })).includes('sent');
-    if (!pushed) {
-      // A WhatsApp error falls through to e-mail instead of retrying (a retry would push again).
-      const wa = await this.sendWhatsApp(alert, 'ps_followup', { dedupe: false }).catch(
-        () => 'failed' as const,
-      );
-      if (wa !== 'sent') await this.sendEmail(alert, 'alert_followup', { dedupe: false });
-    }
+    if (!alert || alert.followup_sent_at || !alert.scanner_waiting_at) return;
+    if (alert.status !== 'acknowledged' || alert.expires_at < new Date()) return;
+    const token = await this.ack.renew(alert.id, alert.expires_at);
+    const msg: Message = { kind: 'followup', token, links: this.ack.links(token), dedupe: false };
+    const { outcomes, errors } = await this.deliver(alert, msg, FASTEST, false);
+    if (!outcomes.includes('sent') && errors.length) throw errors[0];
     await this.db
       .updateTable('alerts')
       .set({ followup_sent_at: sql`now()` })
       .where('id', '=', alertId)
       .where('followup_sent_at', 'is', null)
       .execute();
+  }
+
+  private async deliver(
+    alert: AlertRow,
+    msg: Message,
+    order: OrderableChannel[],
+    everywhere: boolean,
+  ) {
+    const outcomes: Outcome[] = [];
+    const errors: unknown[] = [];
+    for (const channel of order) {
+      let outcome: Outcome;
+      try {
+        outcome =
+          channel === 'webpush'
+            ? await this.sendPush(alert, msg)
+            : channel === 'email'
+              ? await this.sendEmail(alert, msg)
+              : await this.sendWhatsApp(alert, msg);
+      } catch (err) {
+        errors.push(err);
+        outcome = 'failed';
+      }
+      outcomes.push(outcome);
+      if (!everywhere && (outcome === 'sent' || outcome === 'already')) break;
+    }
+    return { outcomes, errors };
   }
 
   // --- channels --------------------------------------------------------------------------------
@@ -141,6 +175,7 @@ export class DispatchService {
       .selectFrom('alert_deliveries')
       .select('id')
       .where('alert_id', '=', alertId)
+      .where('recipient', '=', 'owner')
       .where('channel', '=', channel)
       .where('status', 'in', [...DONE]);
     if (providerMessageId) q = q.where('provider_message_id', '=', providerMessageId);
@@ -208,13 +243,14 @@ export class DispatchService {
     };
   }
 
-  private async sendEmail(
-    alert: AlertRow,
-    template: 'alert_received' | 'alert_test' | 'alert_followup',
-    opts = { dedupe: true },
-  ): Promise<Outcome> {
+  private replyButtons(alert: AlertRow, links: ReplyLinks) {
+    const labels = REPLY_LABELS[alert.preferred_lang];
+    return OWNER_REPLIES.map((r) => ({ label: labels[r], url: links[r] }));
+  }
+
+  private async sendEmail(alert: AlertRow, msg: Message): Promise<Outcome> {
     const provider = fakeProviders(this.env).mail ? 'dev' : 'brevo';
-    if (opts.dedupe && (await this.alreadySent(alert.id, 'email'))) return 'skipped';
+    if (msg.dedupe && (await this.alreadySent(alert.id, 'email'))) return 'already';
     if (!(await this.enabled('email'))) {
       await this.record({
         alertId: alert.id,
@@ -231,13 +267,19 @@ export class DispatchService {
       provider,
       status: 'queued',
     });
+    const template = {
+      alert: 'alert_received',
+      test: 'alert_test',
+      followup: 'alert_followup',
+    } as const;
     try {
       await this.mail.send({
         to: alert.email,
-        template,
+        template: template[msg.kind],
         locale: alert.preferred_lang,
         values: this.alertValues(alert),
         actionUrl: `${this.env.WEB_BASE_URL}/konto`,
+        replies: this.replyButtons(alert, msg.links),
       });
     } catch (err) {
       await this.finish(delivery.id, { ok: false, error: String(err) });
@@ -247,17 +289,13 @@ export class DispatchService {
     return 'sent';
   }
 
-  private async sendPushAll(
-    alert: AlertRow,
-    kind: PushKind,
-    opts = { dedupe: true },
-  ): Promise<Outcome[]> {
+  private async sendPush(alert: AlertRow, msg: Message): Promise<Outcome> {
     const devices = await this.db
       .selectFrom('push_subscriptions')
       .select(['id', 'endpoint', 'p256dh', 'auth', 'device_label', 'platform', 'failed_count'])
       .where('user_id', '=', alert.userId)
       .execute();
-    if (!devices.length) return [];
+    if (!devices.length) return 'unavailable';
     if (!(await this.enabled('webpush'))) {
       await this.record({
         alertId: alert.id,
@@ -266,22 +304,33 @@ export class DispatchService {
         status: 'suppressed',
         reason: 'kill_switch',
       });
-      return ['suppressed'];
+      return 'suppressed';
     }
     const values = this.alertValues(alert);
-    const text = pushText(alert.preferred_lang, kind, values.type, values.nickname);
+    const pushKind: PushKind = msg.kind;
+    const text = pushText(alert.preferred_lang, pushKind, values.type, values.nickname);
+    const labels = REPLY_LABELS[alert.preferred_lang];
     const payload = JSON.stringify({
       ...text,
-      url: `${this.env.WEB_BASE_URL}/konto`,
+      lang: alert.preferred_lang,
+      url: msg.links.page,
       tag: `alert-${alert.id}`,
+      // The service worker posts the reply directly when an action button is tapped (OW-16).
+      token: msg.token,
+      // Most browsers show two actions; the third reply is on the page the notification opens.
+      actions: (['coming', 'not_nearby', 'in_30_min'] as const).map((action) => ({
+        action,
+        title: labels[action],
+      })),
+      replied: REPLY_SENT[alert.preferred_lang],
     });
-    const urgent = alert.severity === 'urgent' || kind === 'followup';
+    const urgent = alert.severity === 'urgent' || msg.kind === 'followup';
 
-    return Promise.all(
+    const results = await Promise.all(
       devices.map(async (d): Promise<Outcome> => {
         // The subscription id marks the device, so each device is notified at most once per alert.
         const marker = `sub:${d.id}`;
-        if (opts.dedupe && (await this.alreadySent(alert.id, 'webpush', marker))) return 'skipped';
+        if (msg.dedupe && (await this.alreadySent(alert.id, 'webpush', marker))) return 'already';
         const delivery = await this.record({
           alertId: alert.id,
           channel: 'webpush',
@@ -316,6 +365,10 @@ export class DispatchService {
         return 'failed';
       }),
     );
+    // Push errors are counted per device (NT-06) and never thrown: a retry would count them twice.
+    if (results.includes('sent')) return 'sent';
+    if (results.includes('already')) return 'already';
+    return 'failed';
   }
 
   /** NT-06: remove the subscription and tell the owner by e-mail how to turn push back on. */
@@ -330,14 +383,12 @@ export class DispatchService {
       .executeTakeFirst();
     if (!Number(removed.numDeletedRows)) return;
     this.logger.info({ why }, 'push subscription removed');
-    const device =
-      d.device_label ??
-      (alert.preferred_lang === 'en'
+    const names =
+      alert.preferred_lang === 'en'
         ? { ios: 'your iPhone', android: 'your Android phone', desktop: 'your computer' }
-        : { ios: 'Ihrem iPhone', android: 'Ihrem Android-Gerät', desktop: 'Ihrem Computer' })[
-        (d.platform as 'ios' | 'android' | 'desktop') ?? 'desktop'
-      ] ??
-      'device';
+        : { ios: 'Ihrem iPhone', android: 'Ihrem Android-Gerät', desktop: 'Ihrem Computer' };
+    const device =
+      d.device_label ?? names[(d.platform as keyof typeof names) ?? 'desktop'] ?? names.desktop;
     await this.mail
       .send({
         to: alert.email,
@@ -349,11 +400,7 @@ export class DispatchService {
       .catch((err: unknown) => this.logger.warn({ err: String(err) }, 'push_removed mail failed'));
   }
 
-  private async sendWhatsApp(
-    alert: AlertRow,
-    template: 'ps_alert' | 'ps_test' | 'ps_followup',
-    opts = { dedupe: true },
-  ): Promise<Outcome> {
+  private async sendWhatsApp(alert: AlertRow, msg: Message): Promise<Outcome> {
     const channel = await this.db
       .selectFrom('contact_channels')
       .select(['address_enc'])
@@ -363,9 +410,9 @@ export class DispatchService {
       .where('verified_at', 'is not', null)
       .where('opted_in_at', 'is not', null)
       .executeTakeFirst();
-    if (!channel?.address_enc) return 'skipped';
+    if (!channel?.address_enc) return 'unavailable';
     const provider = fakeProviders(this.env).whatsapp ? 'dev' : '360dialog';
-    if (opts.dedupe && (await this.alreadySent(alert.id, 'whatsapp'))) return 'skipped';
+    if (msg.dedupe && (await this.alreadySent(alert.id, 'whatsapp'))) return 'already';
     if (!(await this.enabled('whatsapp'))) {
       await this.record({
         alertId: alert.id,
@@ -385,12 +432,15 @@ export class DispatchService {
       costMicros: cost,
     });
     const values = this.alertValues(alert);
+    const template = { alert: 'ps_alert', test: 'ps_test', followup: 'ps_followup' } as const;
     try {
       const { messageId } = await this.whatsapp.sendTemplate({
         to: this.crypto.decrypt(channel.address_enc).replace(/^\+/, ''),
-        template,
+        template: template[msg.kind],
         lang: alert.preferred_lang,
-        params: template === 'ps_test' ? [values.nickname] : [values.type, values.nickname],
+        params: msg.kind === 'test' ? [values.nickname] : [values.type, values.nickname],
+        // Quick-reply buttons in template order: Ich komme · In ca. 30 Min · Bin nicht in der Nähe.
+        buttons: OWNER_REPLIES.map((r) => `ack:${msg.token}:${r}`),
       });
       await this.finish(delivery.id, { ok: true, messageId });
       return 'sent';

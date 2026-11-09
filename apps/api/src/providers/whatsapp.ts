@@ -20,9 +20,16 @@ export class Dialog360Sender implements WhatsAppSender {
     template: WhatsAppTemplate;
     lang: 'de' | 'en';
     params: string[];
+    buttons?: string[];
   }): Promise<{ messageId: string }> {
     const components: unknown[] = [
       { type: 'body', parameters: input.params.map((text) => ({ type: 'text', text })) },
+      ...(input.buttons ?? []).map((payload, index) => ({
+        type: 'button',
+        sub_type: 'quick_reply',
+        index: String(index),
+        parameters: [{ type: 'payload', payload }],
+      })),
     ];
     if (input.template === 'ps_otp') {
       components.push({
@@ -63,6 +70,7 @@ export class DevWhatsAppSender implements WhatsAppSender {
     template: WhatsAppTemplate;
     lang: 'de' | 'en';
     params: string[];
+    buttons?: string[];
   }): Promise<{ messageId: string }> {
     const messageId = `wamid.dev.${randomToken(12)}`;
     await this.valkey

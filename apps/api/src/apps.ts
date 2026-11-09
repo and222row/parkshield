@@ -28,7 +28,15 @@ import { VehiclesController } from './vehicles/vehicles.controller';
 import { VehiclesService } from './vehicles/vehicles.service';
 import { ChannelsController, WhatsAppWebhookController } from './channels/channels.controller';
 import { ChannelsService } from './channels/channels.service';
+import {
+  EmergencyContactInvitationsController,
+  EmergencyContactsController,
+} from './contacts/emergency-contacts.controller';
+import { EmergencyContactsService } from './contacts/emergency-contacts.service';
+import { AckController } from './notifications/ack.controller';
+import { AckService } from './notifications/ack.service';
 import { DispatchService } from './notifications/dispatch.service';
+import { EscalationService } from './notifications/escalation.service';
 import { WhatsAppWebhookService } from './notifications/whatsapp-webhook.service';
 import { ScanController } from './scan/scan.controller';
 import { ScanService } from './scan/scan.service';
@@ -50,6 +58,9 @@ const domainProviders = [
   DispatchService,
   ChannelsService,
   WhatsAppWebhookService,
+  EscalationService,
+  AckService,
+  EmergencyContactsService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -72,6 +83,9 @@ export class PublicAppModule {
         ScanController,
         ChannelsController,
         WhatsAppWebhookController,
+        AckController,
+        EmergencyContactsController,
+        EmergencyContactInvitationsController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [

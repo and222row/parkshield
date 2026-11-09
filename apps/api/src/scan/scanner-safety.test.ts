@@ -5,6 +5,7 @@ import { CRYPTO } from '../core/tokens';
 import { DispatchService } from '../notifications/dispatch.service';
 import { DEV_CAPTCHA_SOLUTION } from '../providers/captcha';
 import {
+  addConfirmedContact,
   createHarness,
   lastMail,
   resetState,
@@ -141,8 +142,9 @@ describe('the three scanner limits (US-17)', () => {
 });
 
 describe('"Ich warte noch" and the owner reminder (US-18, SC-14, NT-09)', () => {
-  async function acknowledged(minutesAgo: number, type = 'blocking') {
+  async function acknowledged(minutesAgo: number, type = 'blocking', contact = true) {
     const { code } = await vehicle('owner@example.de');
+    if (contact) await addConfirmedContact(h, 'owner@example.de');
     const res = await send(code, { type });
     const { alertId, statusToken } = res.json();
     await h.db
@@ -197,6 +199,13 @@ describe('"Ich warte noch" and the owner reminder (US-18, SC-14, NT-09)', () => 
 
   it('does not invent an escalation for types that never escalate', async () => {
     const { alertId, statusToken } = await acknowledged(16, 'lights_on');
+    expect((await waiting(alertId, statusToken)).statusCode).toBe(200);
+    const a = await h.db.selectFrom('alerts').select('escalate_at').executeTakeFirstOrThrow();
+    expect(a.escalate_at).toBeNull();
+  });
+
+  it('does not schedule an escalation without a confirmed emergency contact', async () => {
+    const { alertId, statusToken } = await acknowledged(16, 'blocking', false);
     expect((await waiting(alertId, statusToken)).statusCode).toBe(200);
     const a = await h.db.selectFrom('alerts').select('escalate_at').executeTakeFirstOrThrow();
     expect(a.escalate_at).toBeNull();

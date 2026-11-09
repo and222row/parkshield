@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import type { AuthContext } from '../auth/session.service';
 import type { Env } from '../config/env';
 import { ENV } from '../core/tokens';
 import { ZodPipe } from '../core/zod.pipe';
+import { ORDERABLE } from '../notifications/channel-order';
 import { WhatsAppWebhookService } from '../notifications/whatsapp-webhook.service';
 import { ChannelsService } from './channels.service';
 
@@ -33,6 +35,7 @@ const WhatsAppStart = z.object({
   consent: z.literal(true),
 });
 const WhatsAppVerify = z.object({ code: z.string().regex(/^\d{6}$/) });
+const ChannelOrder = z.object({ order: z.array(z.enum(ORDERABLE)).length(ORDERABLE.length) });
 
 @Controller('v1')
 @UseGuards(SessionGuard)
@@ -42,6 +45,14 @@ export class ChannelsController {
   @Get('channels')
   overview(@CurrentUser() user: AuthContext) {
     return this.channels.overview(user);
+  }
+
+  @Put('channels/order')
+  async saveOrder(
+    @CurrentUser() user: AuthContext,
+    @Body(new ZodPipe(ChannelOrder)) body: z.infer<typeof ChannelOrder>,
+  ) {
+    return { order: await this.channels.saveOrder(user.userId, body.order) };
   }
 
   @Post('push-subscriptions')

@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { PageShell } from '@/components/site-chrome';
 import { api, ApiError, errorText } from '@/lib/api-client';
-import type { ChannelsOverview, PushDevice } from '@/lib/api-server';
+import type { ChannelsOverview, OrderableChannel, PushDevice } from '@/lib/api-server';
 import { useBrowserValue } from '@/lib/use-browser-value';
 
 type Message = { tone: 'success' | 'danger' | 'warning'; text: string } | null;
@@ -50,9 +50,100 @@ export function NotificationsView({ initial }: { initial: ChannelsOverview }) {
               <Text>{t('channels.emailText', { email: data.email.address })}</Text>
             </Stack>
           </Card>
+          <OrderCard
+            order={data.order}
+            setUp={{
+              webpush: data.push.devices.length > 0,
+              email: true,
+              whatsapp: Boolean(data.whatsapp),
+            }}
+            onSaved={(order) => setData((d) => ({ ...d, order }))}
+          />
         </Stack>
       </Container>
     </PageShell>
+  );
+}
+
+/** US-22 / OW-05: the order normal alerts follow. Up/down buttons rather than drag and drop (a11y). */
+function OrderCard({
+  order,
+  setUp,
+  onSaved,
+}: {
+  order: OrderableChannel[];
+  setUp: Record<OrderableChannel, boolean>;
+  onSaved: (order: OrderableChannel[]) => void;
+}) {
+  const { t } = useI18n();
+  const [status, setStatus] = useState<string | null>(null);
+  const name = (channel: OrderableChannel) => t('channels.channelName', { channel });
+
+  async function move(index: number, by: -1 | 1) {
+    const next = [...order];
+    const [item] = next.splice(index, 1);
+    next.splice(index + by, 0, item!);
+    setStatus(null);
+    try {
+      const saved = await api<{ order: OrderableChannel[] }>('/v1/channels/order', {
+        method: 'PUT',
+        body: { order: next },
+      });
+      onSaved(saved.order);
+      setStatus(t('channels.orderSaved'));
+    } catch (err) {
+      setStatus(errorText(err, t));
+    }
+  }
+
+  return (
+    <Card>
+      <Stack gap={3}>
+        <Heading level={2} className="text-xl">
+          {t('channels.orderTitle')}
+        </Heading>
+        <Text>{t('channels.orderIntro')}</Text>
+        <ol className="flex flex-col gap-2" aria-label={t('channels.orderTitle')}>
+          {order.map((c, i) => (
+            <li
+              key={c}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-2"
+            >
+              <span>
+                <span className="font-semibold">
+                  {i + 1}. {name(c)}
+                </span>
+                {!setUp[c] && <span className="text-muted"> ({t('channels.orderNotSetUp')})</span>}
+              </span>
+              <span className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={i === 0}
+                  onClick={() => move(i, -1)}
+                  aria-label={t('channels.orderUp', { channel: name(c) })}
+                >
+                  ↑
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={i === order.length - 1}
+                  onClick={() => move(i, 1)}
+                  aria-label={t('channels.orderDown', { channel: name(c) })}
+                >
+                  ↓
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p role="status" className="text-sm text-muted">
+          {status}
+        </p>
+        <Text muted className="text-sm">
+          {t('channels.orderUrgent')}
+        </Text>
+      </Stack>
+    </Card>
   );
 }
 

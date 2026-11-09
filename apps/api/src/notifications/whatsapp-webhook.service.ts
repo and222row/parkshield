@@ -1,8 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { z } from 'zod';
+import type { Logger } from 'pino';
 import type { Db } from '../core/core.module';
-import { DB } from '../core/tokens';
+import { DB, LOGGER } from '../core/tokens';
+import type { OwnerReply } from '../db/types.generated';
+import { AckService } from './ack.service';
 
 const Status = z.object({
   id: z.string().max(128),
@@ -10,24 +13,41 @@ const Status = z.object({
   timestamp: z.coerce.number().optional(),
   errors: z.array(z.object({ code: z.coerce.string() })).optional(),
 });
+// Quick-reply tap on a template button: the payload was set by DispatchService (`ack:<token>:<reply>`).
+const ButtonMessage = z.object({
+  type: z.literal('button'),
+  button: z.object({ payload: z.string().max(256) }),
+});
 const Payload = z.object({
   entry: z
     .array(
       z.object({
         changes: z.array(
-          z.object({ value: z.object({ statuses: z.array(z.unknown()).optional() }).loose() }),
+          z.object({
+            value: z
+              .object({
+                statuses: z.array(z.unknown()).optional(),
+                messages: z.array(z.unknown()).optional(),
+              })
+              .loose(),
+          }),
         ),
       }),
     )
     .default([]),
 });
+const REPLY_PAYLOAD = /^ack:([A-Za-z0-9_-]{20,100}):(coming|in_30_min|not_nearby)$/;
 
 const RANK = { queued: 0, sent: 1, delivered: 2, read: 3 } as const;
 
-/** NT-04: WhatsApp delivery statuses (Meta Cloud API format, forwarded by 360dialog). */
+/** NT-04 delivery statuses and OW-16 quick replies (Meta Cloud API format, forwarded by 360dialog). */
 @Injectable()
 export class WhatsAppWebhookService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(AckService) private readonly ack: AckService,
+    @Inject(LOGGER) private readonly logger: Logger,
+  ) {}
 
   async handle(body: unknown): Promise<number> {
     const parsed = Payload.safeParse(body);
@@ -38,6 +58,18 @@ export class WhatsAppWebhookService {
         for (const raw of change.value.statuses ?? []) {
           const s = Status.safeParse(raw);
           if (s.success) updated += await this.apply(s.data);
+        }
+        for (const raw of change.value.messages ?? []) {
+          const m = ButtonMessage.safeParse(raw);
+          const match = m.success ? REPLY_PAYLOAD.exec(m.data.button.payload) : null;
+          if (!match) continue;
+          try {
+            await this.ack.reply(match[1]!, match[2] as OwnerReply);
+            updated += 1;
+          } catch (err) {
+            // Second tap, expired alert: nothing to do. Meta must still get a 200.
+            this.logger.info({ err: (err as Error).message }, 'whatsapp quick reply not applied');
+          }
         }
       }
     }

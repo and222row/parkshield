@@ -7,6 +7,8 @@ interface Job {
   name: string;
   everyMs: number;
   run: () => Promise<unknown>;
+  /** Frequent jobs log only when they did something (a truthy result). */
+  quiet?: boolean;
 }
 
 /**
@@ -24,11 +26,12 @@ export class SchedulerService implements OnModuleDestroy {
 
   every(job: Job): void {
     const tick = async () => {
-      const lock = await this.valkey.set(`job:${job.name}`, '1', 'PX', job.everyMs - 1000, 'NX');
+      const lockMs = Math.max(job.everyMs - 1000, Math.floor(job.everyMs / 2));
+      const lock = await this.valkey.set(`job:${job.name}`, '1', 'PX', lockMs, 'NX');
       if (!lock) return;
       try {
         const result = await job.run();
-        this.logger.info({ job: job.name, result }, 'job finished');
+        if (!job.quiet || result) this.logger.info({ job: job.name, result }, 'job finished');
       } catch (err) {
         this.logger.error({ job: job.name, err: String(err) }, 'job failed');
       }

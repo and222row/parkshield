@@ -7,8 +7,9 @@ import { buildPublicApp } from '../apps';
 import { loadEnv, type Env } from '../config/env';
 import type { Db } from '../core/core.module';
 import { createLogger } from '../core/logger';
+import type { FieldCrypto } from '../core/crypto';
 import { SettingsService } from '../core/settings.service';
-import { DB } from '../core/tokens';
+import { CRYPTO, DB } from '../core/tokens';
 import { DEV_CAPTCHA_SOLUTION } from '../providers/captcha';
 
 export const UA_WINDOWS_CHROME =
@@ -61,6 +62,36 @@ export async function setSetting(h: Harness, key: string, value: unknown): Promi
     .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify(value) }))
     .execute();
   h.app.get(SettingsService).invalidate();
+}
+
+/** A confirmed emergency contact for the owner, as if they had accepted the invitation. */
+export async function addConfirmedContact(
+  h: Harness,
+  ownerEmail: string,
+  contactEmail = 'kontakt@example.de',
+  vehicleId: string | null = null,
+): Promise<string> {
+  const crypto = h.app.get<FieldCrypto>(CRYPTO);
+  const owner = await h.db
+    .selectFrom('users')
+    .select('id')
+    .where('email', '=', ownerEmail)
+    .executeTakeFirstOrThrow();
+  const row = await h.db
+    .insertInto('emergency_contacts')
+    .values({
+      user_id: owner.id,
+      vehicle_id: vehicleId,
+      display_name: 'Kim',
+      channel: 'email',
+      address_enc: crypto.encrypt(contactEmail),
+      address_bidx: crypto.blindIndex(contactEmail),
+      consent: 'confirmed',
+      consent_decided_at: new Date(),
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return row.id;
 }
 
 export async function createHarness(): Promise<Harness> {

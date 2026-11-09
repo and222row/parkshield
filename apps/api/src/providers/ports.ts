@@ -30,6 +30,8 @@ export interface WhatsAppSender {
     template: WhatsAppTemplate;
     lang: 'de' | 'en';
     params: string[];
+    /** Quick-reply button payloads, in template button order (NT-02). */
+    buttons?: string[];
   }): Promise<{ messageId: string }>;
 }
 

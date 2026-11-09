@@ -10,6 +10,13 @@ import type { Db } from '../core/core.module';
 import type { FieldCrypto } from '../core/crypto';
 import { sha256 } from '../core/crypto';
 import { RateLimitService } from '../core/rate-limit.service';
+import { SettingsService } from '../core/settings.service';
+import {
+  channelOrder,
+  ORDERABLE,
+  saveChannelOrder,
+  type OrderableChannel,
+} from '../notifications/channel-order';
 import { CRYPTO, DB, ENV, VALKEY } from '../core/tokens';
 import { WHATSAPP, type WhatsAppSender } from '../providers/ports';
 import { allowedPushEndpoint } from '../providers/push';
@@ -47,6 +54,7 @@ export class ChannelsService {
     @Inject(CRYPTO) private readonly crypto: FieldCrypto,
     @Inject(RateLimitService) private readonly limits: RateLimitService,
     @Inject(WHATSAPP) private readonly whatsapp: WhatsAppSender,
+    @Inject(SettingsService) private readonly settings: SettingsService,
   ) {}
 
   async overview(user: AuthContext) {
@@ -72,6 +80,8 @@ export class ChannelsService {
         .executeTakeFirst(),
     ]);
     return {
+      // US-22: normal alerts try channels in this order and stop at the first that works.
+      order: await channelOrder(this.db, this.settings, user.userId),
       email: { address: user.email },
       push: { publicKey: this.env.VAPID_PUBLIC_KEY, devices },
       whatsapp: wa?.address_enc
@@ -82,6 +92,14 @@ export class ChannelsService {
           }
         : null,
     };
+  }
+
+  async saveOrder(userId: string, order: OrderableChannel[]): Promise<OrderableChannel[]> {
+    if (new Set(order).size !== order.length || order.length !== ORDERABLE.length) {
+      throw new BadRequestException({ error: 'order_invalid' });
+    }
+    await saveChannelOrder(this.db, userId, order);
+    return channelOrder(this.db, this.settings, userId);
   }
 
   // --- Web Push (US-20) -----------------------------------------------------------------------
@@ -169,6 +187,8 @@ export class ChannelsService {
       });
     }
     await this.valkey.del(key);
+    // Keep WhatsApp where the owner's order puts it (US-22).
+    const order = await channelOrder(this.db, this.settings, user.userId);
     await this.db.transaction().execute(async (trx) => {
       await trx
         .deleteFrom('contact_channels')
@@ -183,7 +203,7 @@ export class ChannelsService {
           address_enc: this.crypto.encrypt(pending.phone),
           address_bidx: this.crypto.blindIndex(pending.phone),
           key_version: this.crypto.keyVersion,
-          priority: 3,
+          priority: order.indexOf('whatsapp') + 1,
           verified_at: sql`now()`,
           opted_in_at: sql`now()`,
         })

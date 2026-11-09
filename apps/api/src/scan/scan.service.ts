@@ -9,6 +9,7 @@ import { RateLimitService } from '../core/rate-limit.service';
 import { SettingsService } from '../core/settings.service';
 import { CRYPTO, DB } from '../core/tokens';
 import { filterText } from '../moderation/text-filter';
+import { EscalationService } from '../notifications/escalation.service';
 import { ScannerRefService } from './scanner-ref.service';
 
 export const DISPATCH_TOPIC = 'alert.dispatch';
@@ -38,6 +39,7 @@ export class ScanService {
     @Inject(ScannerRefService) private readonly refs: ScannerRefService,
     @Inject(RateLimitService) private readonly limits: RateLimitService,
     @Inject(GeoService) private readonly geo: GeoService,
+    @Inject(EscalationService) private readonly escalation: EscalationService,
   ) {}
 
   /**
@@ -122,7 +124,7 @@ export class ScanService {
   ): Promise<{ alertId: string; statusToken: string }> {
     const type = await this.db
       .selectFrom('alert_types')
-      .select(['code', 'severity'])
+      .select(['code', 'severity', 'escalates'])
       .where('code', '=', input.type)
       .where('is_active', '=', true)
       .executeTakeFirst();
@@ -188,6 +190,15 @@ export class ScanService {
 
     const statusToken = randomToken();
     const blockedScanner = !isTest && (await this.isBlocked(token.tokenId, refs));
+    // 02-architecture §3 step 3: set only for escalating types with a confirmed emergency contact.
+    const escalateAt = blockedScanner
+      ? null
+      : await this.escalation.initialEscalateAt({
+          ownerId: token.ownerId,
+          vehicleId: token.vehicleId,
+          escalates: type.escalates,
+          isTest,
+        });
     const alertId = await this.db.transaction().execute(async (trx) => {
       const alert = await trx
         .insertInto('alerts')
@@ -197,6 +208,7 @@ export class ScanService {
           moderation: message ? 'passed' : 'not_required',
           status_view_hash: sha256(statusToken),
           dispatched_at: blockedScanner ? null : sql`now()`,
+          escalate_at: escalateAt,
         })
         .returning('id')
         .executeTakeFirstOrThrow();
@@ -311,17 +323,21 @@ export class ScanService {
       const a = await trx
         .selectFrom('alerts')
         .innerJoin('alert_types as t', 't.code', 'alerts.alert_type')
+        .innerJoin('vehicles as v', 'v.id', 'alerts.vehicle_id')
         .select([
-          'id',
+          'alerts.id',
           'status',
           'acknowledged_at',
           'scanner_waiting_at',
           'expires_at',
+          'is_test',
+          'vehicle_id',
+          'v.owner_user_id',
           't.escalates',
         ])
-        .where('id', '=', alertId)
+        .where('alerts.id', '=', alertId)
         .where('status_view_hash', '=', sha256(statusToken))
-        .forUpdate()
+        .forUpdate('alerts')
         .executeTakeFirst();
       if (!a) return 'not_found';
       if (a.scanner_waiting_at) return 'used';
@@ -331,13 +347,17 @@ export class ScanService {
       if (a.status !== 'acknowledged' || availableAt > Date.now() || a.expires_at < new Date()) {
         return 'not_yet';
       }
+      // SC-14: escalation at most N minutes later unless the owner replies to the reminder, but only
+      // for escalating types with a confirmed emergency contact (NT-03).
+      const applies =
+        a.escalates &&
+        !a.is_test &&
+        (await this.escalation.hasContact(a.owner_user_id, a.vehicle_id, trx));
       await trx
         .updateTable('alerts')
         .set({
           scanner_waiting_at: sql`now()`,
-          // SC-14: escalation (if the type escalates) at most N minutes later unless the owner replies.
-          // Whether an emergency contact exists is checked by the escalation job (NT-03).
-          ...(a.escalates
+          ...(applies
             ? {
                 escalate_at: sql`CASE WHEN escalated_at IS NULL
                   THEN least(coalesce(escalate_at, 'infinity'::timestamptz), now() + make_interval(mins => ${escalateMinutes}))

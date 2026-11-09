@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 export const API_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -46,6 +46,43 @@ export async function expectAccessible(page: Page) {
     .exclude('nextjs-portal')
     .analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.length})`)).toEqual([]);
+}
+
+/** A stranger's phone: fresh context, no cookies, German. */
+export async function scannerPage(browser: Browser, url: string) {
+  const ctx = await browser.newContext({ locale: 'de-DE' });
+  const page = await ctx.newPage();
+  await page.goto(url);
+  return { ctx, page };
+}
+
+/**
+ * Signs up, pays, adds "Der Blaue" and uses up the decal's test window, so the next scans are real
+ * alerts. Returns the scan URL.
+ */
+export async function ownerWithActiveDecal(
+  page: Page,
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  await signUp(page, request, email);
+  await page.getByLabel(/Ich verlange ausdrücklich/).check();
+  await page.getByRole('button', { name: 'Zahlungspflichtig bestellen' }).click();
+  await page.getByRole('button', { name: 'Testzahlung ausführen' }).click();
+  await expect(page.getByText(/^Vertragsnummer: PS-/)).toBeVisible({ timeout: 15_000 });
+  await page.goto('/konto/fahrzeuge');
+  await page.getByLabel('Spitzname').fill('Der Blaue');
+  await page.getByLabel('Kennzeichen').fill('K-AB 1234');
+  await page.getByRole('button', { name: 'Fahrzeug hinzufügen' }).click();
+  await page.getByRole('link', { name: /Aufkleber und Details/ }).click();
+  await page.getByRole('button', { name: 'Aufkleber testen' }).click();
+  const link = page.getByRole('link', { name: 'Scan-Seite auf diesem Gerät öffnen' });
+  const url = (await link.getAttribute('href'))!;
+  const own = await scannerPage(page.context().browser()!, url);
+  await own.page.getByRole('button', { name: 'Licht brennt noch' }).click();
+  await expect(own.page.getByText('Test gesendet.', { exact: false })).toBeVisible();
+  await own.ctx.close();
+  return url;
 }
 
 /** Signs up through the real UI and the e-mailed magic link; ends on /konto. */

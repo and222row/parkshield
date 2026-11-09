@@ -284,6 +284,88 @@ const de = {
     waCodeWrong:
       'Der Code stimmt nicht. {left, plural, =0 {Bitte fordern Sie einen neuen an.} one {Noch # Versuch.} other {Noch # Versuche.}}',
     waCodeExpired: 'Der Code ist abgelaufen. Bitte fordern Sie einen neuen an.',
+    orderTitle: 'Reihenfolge bei normalen Warnungen',
+    orderIntro:
+      'Wir versuchen die Kanäle nacheinander und hören beim ersten auf, der funktioniert. Klappt einer nicht, nehmen wir sofort den nächsten.',
+    orderUrgent: 'Dringende Warnungen und Tests gehen immer an alle Kanäle gleichzeitig.',
+    orderUp: '{channel} nach oben',
+    orderDown: '{channel} nach unten',
+    orderSaved: 'Reihenfolge gespeichert.',
+    orderNotSetUp: 'noch nicht eingerichtet',
+    channelName:
+      '{channel, select, webpush {Push} email {E-Mail} whatsapp {WhatsApp} other {{channel}}}',
+  },
+  reply: {
+    title: 'Antworten',
+    intro: 'Ein Tipp genügt. Die Person am Fahrzeug sieht Ihre Antwort sofort.',
+    alertLine: '{type} bei „{nickname}“, {time, time, short} Uhr',
+    coming: 'Ich komme',
+    in_30_min: 'In ca. 30 Min',
+    not_nearby: 'Bin nicht in der Nähe',
+    doneComing: 'Danke! Die Person sieht, dass Sie unterwegs sind.',
+    doneIn30: 'Danke! Die Person sieht, dass Sie in etwa 30 Minuten da sind.',
+    doneNotNearby:
+      'Danke! Die Person sieht, dass Sie nicht in der Nähe sind, und bekommt Hinweise, wer sonst helfen kann.',
+    doneNotNearbyEscalating: 'Danke! Wir benachrichtigen jetzt Ihren Notfallkontakt.',
+    already:
+      'Sie haben bereits geantwortet{reply, select, coming {: „Ich komme“} in_30_min {: „In ca. 30 Min“} not_nearby {: „Bin nicht in der Nähe“} other {}}.',
+    expired: 'Diese Warnung ist abgelaufen. Antworten sind nicht mehr möglich.',
+    invalid:
+      'Dieser Link ist ungültig. Bitte nutzen Sie den Link aus Ihrer neuesten Benachrichtigung.',
+    testNote: 'Das ist Ihre Testwarnung. Probieren Sie die Antwort ruhig aus.',
+    escalated:
+      'Ihr Notfallkontakt wurde bereits benachrichtigt. Ihre Antwort sieht die Person trotzdem.',
+    loading: 'Wird geladen …',
+  },
+  contacts: {
+    title: 'Notfallkontakte',
+    intro:
+      'Reagieren Sie bei einer dringenden Warnung nicht, informieren wir Ihren Notfallkontakt per E-Mail. Er erfährt nur, was los ist und um welches Fahrzeug es geht.',
+    toAccount: '← Zum Konto',
+    manage: 'Notfallkontakte verwalten',
+    summary:
+      '{count, plural, =0 {Noch kein Notfallkontakt} one {# Notfallkontakt} other {# Notfallkontakte}}',
+    none: 'Noch kein Notfallkontakt.',
+    statusPending: 'Wartet auf Zustimmung bis {date, date, medium}',
+    statusConfirmed: 'Bestätigt',
+    statusDeclined: 'Abgelehnt',
+    allVehicles: 'Alle Fahrzeuge',
+    forVehicle: 'Für „{nickname}“',
+    remove: 'Entfernen',
+    removeLabel: 'Notfallkontakt entfernen: {name}',
+    addTitle: 'Notfallkontakt einladen',
+    name: 'Name des Kontakts',
+    email: 'E-Mail-Adresse des Kontakts',
+    vehicle: 'Für welches Fahrzeug?',
+    ownerName: 'Ihr Name',
+    ownerNameHint: 'So steht es in der Einladung, damit der Kontakt weiß, wer fragt.',
+    invite: 'Einladung senden',
+    invited: 'Einladung gesendet. Erst wenn {name} zustimmt, ist der Kontakt aktiv.',
+    limitReached:
+      'Ihr Tarif {plan} erlaubt {limit, plural, one {# Notfallkontakt} other {# Notfallkontakte}}. Entfernen Sie einen, um jemand anderen einzuladen.',
+    noSubscription: 'Notfallkontakte gibt es mit einem aktiven Abo.',
+    exists: 'Diese Person ist bereits eingeladen.',
+    self: 'Bitte laden Sie eine andere Person ein, nicht sich selbst.',
+    howItWorks:
+      'Nur bei „Fahrzeug versperrt Ausfahrt“, „Fenster offen“, „Beschädigung“ und „Abschleppen droht“, und nur, wenn Sie nicht reagieren oder „Bin nicht in der Nähe“ antworten.',
+  },
+  invitation: {
+    title: 'Einladung als Notfallkontakt',
+    ask: '{owner} möchte Sie als Notfallkontakt bei ParkShield eintragen.',
+    explain1:
+      'Wer ein Problem mit {vehicle, select, all {dem Auto von {owner}} other {dem Fahrzeug „{vehicle}“}} bemerkt, benachrichtigt den Fahrer anonym über ParkShield.',
+    explain2:
+      'Reagiert der Fahrer bei einem dringenden Problem nicht, schicken wir Ihnen eine E-Mail: was los ist und um welches Fahrzeug es geht. Mehr nicht.',
+    explain3: 'Sie können sich jederzeit über diesen Link wieder abmelden.',
+    accept: 'Zustimmen',
+    decline: 'Ablehnen',
+    accepted: 'Danke! Sie sind jetzt Notfallkontakt für {owner}.',
+    declined: 'Sie haben abgelehnt. Wir löschen Ihre Adresse spätestens nach 14 Tagen.',
+    confirmedState: 'Sie sind Notfallkontakt für {owner}.',
+    withdraw: 'Als Notfallkontakt abmelden',
+    withdrawn: 'Sie sind abgemeldet. Wir haben Ihre Adresse gelöscht und {owner} informiert.',
+    invalid:
+      'Diese Einladung gibt es nicht mehr. Vielleicht wurde sie zurückgezogen oder ist abgelaufen.',
   },
   vehicles: {
     title: 'Fahrzeuge',

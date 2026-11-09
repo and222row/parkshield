@@ -31,8 +31,10 @@ export function AccountView({
   invoices,
   vehicleCount,
   channels,
+  contactCount,
   checkout,
 }: {
+  contactCount: number;
   me: Me;
   subscription: SubscriptionSummary | null;
   invoices: InvoiceSummary[];
@@ -147,6 +149,23 @@ export function AccountView({
               {t('channels.manage')}
             </Link>
           </Card>
+
+          {subscription && (
+            <Card className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Heading level={2} className="text-xl">
+                  {t('contacts.title')}
+                </Heading>
+                <Text muted>{t('contacts.summary', { count: contactCount })}</Text>
+              </div>
+              <Link
+                href="/konto/notfallkontakte"
+                className="inline-flex min-h-12 items-center rounded-xl bg-primary px-5 font-semibold text-primary-fg hover:bg-primary-hover"
+              >
+                {t('contacts.manage')}
+              </Link>
+            </Card>
+          )}
 
           <Card>
             <Stack gap={3}>

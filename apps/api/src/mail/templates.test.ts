@@ -17,6 +17,10 @@ const values = {
   type: 'Fahrzeug versperrt Ausfahrt',
   hasMessage: 'yes',
   message: 'Stehe in der Einfahrt',
+  contact: 'Kim',
+  owner: 'Jonas',
+  hasOwner: 'yes',
+  decision: 'confirmed',
 };
 
 describe('mail templates', () => {

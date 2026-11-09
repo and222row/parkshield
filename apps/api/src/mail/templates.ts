@@ -88,7 +88,7 @@ const templates = {
       lines: [
         'Jemand hat gerade Ihren ParkShield-Aufkleber an „{nickname}“ gescannt: {type}.',
         '{hasMessage, select, yes {Nachricht: „{message}“} other {}}',
-        'Die Person sieht, dass Ihre Warnung angekommen ist.',
+        'Die Person sieht, dass Ihre Warnung angekommen ist. Antworten Sie mit einem Tipp, dann sieht sie auch Ihre Antwort:',
       ],
       action: 'Zum Konto',
     },
@@ -120,9 +120,34 @@ const templates = {
       subject: 'Erinnerung: Jemand wartet an „{nickname}“',
       lines: [
         'Die Person, die Sie wegen „{nickname}“ gewarnt hat ({type}), wartet noch auf Sie.',
-        'Bitte kommen Sie zum Fahrzeug oder antworten Sie kurz, damit sie Bescheid weiß.',
+        'Bitte kommen Sie zum Fahrzeug oder antworten Sie kurz, damit sie Bescheid weiß:',
       ],
-      action: 'Antworten',
+    },
+    escalation: {
+      subject: 'ParkShield: {type} bei „{nickname}“',
+      lines: [
+        'Hallo {contact},',
+        '{hasOwner, select, yes {{owner} hat Sie als Notfallkontakt eingetragen.} other {Sie sind als Notfallkontakt eingetragen.}} Gerade wurde gemeldet: {type} beim Fahrzeug „{nickname}“. Der Fahrer hat nicht reagiert oder ist nicht in der Nähe.',
+        'Bitte versuchen Sie, ihn zu erreichen. Mehr wissen wir nicht, und mehr geben wir zum Schutz aller Beteiligten nicht weiter.',
+        'Sie erhalten diese Nachricht, weil Sie zugestimmt haben. Über den Link in Ihrer Einladung können Sie sich jederzeit abmelden.',
+      ],
+    },
+    ec_invite: {
+      subject: '{owner} möchte Sie als Notfallkontakt bei ParkShield',
+      lines: [
+        'Hallo {contact},',
+        '{owner} nutzt ParkShield: Wer ein Problem mit dem geparkten Auto bemerkt, kann den Fahrer anonym benachrichtigen. Reagiert der Fahrer bei einem dringenden Problem nicht, möchte {owner} Sie per E-Mail informieren.',
+        'Sie erfahren dann nur, was los ist und um welches Fahrzeug es geht. Ohne Ihre Zustimmung schicken wir Ihnen nichts; ohne Antwort löschen wir Ihre Adresse nach 14 Tagen.',
+      ],
+      action: 'Einladung ansehen',
+    },
+    ec_decided: {
+      subject:
+        '{decision, select, confirmed {{contact} ist jetzt Ihr Notfallkontakt} declined {{contact} hat die Einladung abgelehnt} other {{contact} ist nicht mehr Ihr Notfallkontakt}}',
+      lines: [
+        '{decision, select, confirmed {{contact} hat zugestimmt. Bei dringenden Warnungen, auf die Sie nicht reagieren, informieren wir {contact} per E-Mail.} declined {{contact} möchte nicht Ihr Notfallkontakt sein. Sie können eine andere Person einladen.} other {{contact} hat die Zustimmung zurückgezogen. Laden Sie bei Bedarf eine andere Person ein.}}',
+      ],
+      action: 'Notfallkontakte verwalten',
     },
   },
   en: {
@@ -204,7 +229,7 @@ const templates = {
       lines: [
         'Someone just scanned your ParkShield decal on “{nickname}”: {type}.',
         '{hasMessage, select, yes {Message: “{message}”} other {}}',
-        'They can see that your alert has arrived.',
+        'They can see that your alert has arrived. Reply with one tap and they see your answer too:',
       ],
       action: 'Open my account',
     },
@@ -236,9 +261,34 @@ const templates = {
       subject: 'Reminder: someone is waiting at “{nickname}”',
       lines: [
         'The person who alerted you about “{nickname}” ({type}) is still waiting for you.',
-        'Please go to your vehicle or send a short reply so they know.',
+        'Please go to your vehicle or send a short reply so they know:',
       ],
-      action: 'Reply',
+    },
+    escalation: {
+      subject: 'ParkShield: {type} at “{nickname}”',
+      lines: [
+        'Hello {contact},',
+        '{hasOwner, select, yes {{owner} added you as an emergency contact.} other {You are listed as an emergency contact.}} Someone just reported: {type} at the vehicle “{nickname}”. The driver has not responded or is not nearby.',
+        'Please try to reach them. We know nothing more, and to protect everyone involved we share nothing more.',
+        'You receive this because you agreed to it. You can opt out at any time with the link in your invitation.',
+      ],
+    },
+    ec_invite: {
+      subject: '{owner} would like you as an emergency contact on ParkShield',
+      lines: [
+        'Hello {contact},',
+        '{owner} uses ParkShield: anyone who notices a problem with the parked car can notify the driver anonymously. If the driver does not respond to an urgent problem, {owner} would like us to tell you by e-mail.',
+        'You would only learn what is wrong and which vehicle it is. Without your consent we send you nothing; without an answer we delete your address after 14 days.',
+      ],
+      action: 'View invitation',
+    },
+    ec_decided: {
+      subject:
+        '{decision, select, confirmed {{contact} is now your emergency contact} declined {{contact} declined your invitation} other {{contact} is no longer your emergency contact}}',
+      lines: [
+        '{decision, select, confirmed {{contact} agreed. If you do not respond to an urgent alert, we tell {contact} by e-mail.} declined {{contact} does not want to be your emergency contact. You can invite someone else.} other {{contact} withdrew their consent. Invite someone else if needed.}}',
+      ],
+      action: 'Manage emergency contacts',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;
@@ -264,6 +314,8 @@ export function renderMail(
   locale: MailLocale,
   values: MailValues,
   actionUrl?: string,
+  /** Quick replies (NT-02): rendered as buttons above the main action, each a link to the reply page. */
+  replies: { label: string; url: string }[] = [],
 ): { subject: string; text: string; html: string } {
   const src: TemplateSource = templates[locale][template];
   const fmt = (s: string) =>
@@ -271,16 +323,20 @@ export function renderMail(
   const subject = fmt(src.subject);
   const lines = src.lines.map(fmt).filter((l) => l.trim() !== ''); // optional lines render empty
   const action = src.action && actionUrl ? { label: fmt(src.action), url: actionUrl } : undefined;
+  const button = (a: { label: string; url: string }, primary: boolean) =>
+    `<a href="${escapeHtml(a.url)}" style="display:inline-block;margin:0 8px 8px 0;${primary ? 'background:#1d4ed8;color:#fff' : 'background:#e2e8f0;color:#0f172a'};padding:12px 20px;border-radius:12px;text-decoration:none;font-weight:600">${escapeHtml(a.label)}</a>`;
 
   const text = [
     ...lines,
+    ...replies.map((r) => `${r.label}: ${r.url}`),
     ...(action ? ['', `${action.label}: ${action.url}`] : []),
     '',
     '— ParkShield',
   ].join('\n\n');
   const html = `<!doctype html><html lang="${locale}"><body style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:16px;line-height:1.5;color:#0f172a">
 ${lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('\n')}
-${action ? `<p><a href="${escapeHtml(action.url)}" style="display:inline-block;background:#1d4ed8;color:#fff;padding:12px 20px;border-radius:12px;text-decoration:none;font-weight:600">${escapeHtml(action.label)}</a></p>` : ''}
+${replies.length ? `<p>${replies.map((r, i) => button(r, i === 0)).join('')}</p>` : ''}
+${action ? `<p>${button(action, replies.length === 0)}</p>` : ''}
 <p style="color:#475569">— ParkShield</p></body></html>`;
   return { subject, text, html };
 }

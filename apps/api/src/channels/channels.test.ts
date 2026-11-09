@@ -400,11 +400,12 @@ describe('WhatsApp linking (US-21)', () => {
       headers: s.headers,
       payload: { code: otp.params[0] },
     });
-    const id = await alert(code);
+    // Urgent, so WhatsApp is used alongside e-mail (a normal alert stops at the first channel).
+    const id = await alert(code, 'blocking');
     await h.app.get(DispatchService).dispatch(id);
     const msg = (await waInbox())[0]!;
     expect(msg).toMatchObject({ template: 'ps_alert', to: '4915123456789' });
-    expect(msg.params).toEqual(['Licht brennt noch', 'Der Blaue']);
+    expect(msg.params).toEqual(['Fahrzeug versperrt Ausfahrt', 'Der Blaue']);
     const wa = (await deliveries(id)).find((r) => r.channel === 'whatsapp')!;
     expect(wa).toMatchObject({
       status: 'sent',
@@ -446,7 +447,7 @@ describe('WhatsApp linking (US-21)', () => {
     });
     await setSetting(h, 'channels.whatsapp.enabled', false);
     const before = (await waInbox()).length;
-    const id = await alert(code);
+    const id = await alert(code, 'blocking');
     await h.app.get(DispatchService).dispatch(id);
     expect((await waInbox()).length).toBe(before);
     expect((await deliveries(id)).find((r) => r.channel === 'whatsapp')).toMatchObject({

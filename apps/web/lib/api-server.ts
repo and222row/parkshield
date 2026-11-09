@@ -26,7 +26,28 @@ export interface PushDevice {
   lastOkAt: string | null;
 }
 
+export type OrderableChannel = 'webpush' | 'email' | 'whatsapp';
+
+export interface EmergencyContact {
+  id: string;
+  name: string;
+  email: string;
+  vehicleId: string | null;
+  vehicleNickname: string | null;
+  status: 'pending' | 'confirmed' | 'declined' | 'revoked';
+  requestedAt: string;
+  decidedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface EmergencyContactList {
+  limit: number;
+  ownerName: string | null;
+  contacts: EmergencyContact[];
+}
+
 export interface ChannelsOverview {
+  order: OrderableChannel[];
   email: { address: string };
   push: { publicKey: string; devices: PushDevice[] };
   whatsapp: { phone: string; verifiedAt: string; enabled: boolean } | null;

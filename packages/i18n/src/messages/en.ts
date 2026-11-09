@@ -274,6 +274,86 @@ const en: typeof de = {
     waCodeWrong:
       'The code is wrong. {left, plural, =0 {Please request a new one.} one {# attempt left.} other {# attempts left.}}',
     waCodeExpired: 'The code has expired. Please request a new one.',
+    orderTitle: 'Order for normal alerts',
+    orderIntro:
+      'We try the channels one after another and stop at the first one that works. If one fails, we move straight to the next.',
+    orderUrgent: 'Urgent alerts and tests always go to all channels at once.',
+    orderUp: 'Move {channel} up',
+    orderDown: 'Move {channel} down',
+    orderSaved: 'Order saved.',
+    orderNotSetUp: 'not set up yet',
+    channelName:
+      '{channel, select, webpush {Push} email {E-mail} whatsapp {WhatsApp} other {{channel}}}',
+  },
+  reply: {
+    title: 'Reply',
+    intro: 'One tap is enough. The person at the vehicle sees your reply at once.',
+    alertLine: '{type} at “{nickname}”, {time, time, short}',
+    coming: 'I’m coming',
+    in_30_min: 'In about 30 min',
+    not_nearby: 'I’m not nearby',
+    doneComing: 'Thank you! The person sees that you are on your way.',
+    doneIn30: 'Thank you! The person sees that you will be there in about 30 minutes.',
+    doneNotNearby:
+      'Thank you! The person sees that you are not nearby and gets advice on who else can help.',
+    doneNotNearbyEscalating: 'Thank you! We are now notifying your emergency contact.',
+    already:
+      'You have already replied{reply, select, coming {: “I’m coming”} in_30_min {: “In about 30 min”} not_nearby {: “I’m not nearby”} other {}}.',
+    expired: 'This alert has expired. Replies are no longer possible.',
+    invalid: 'This link is not valid. Please use the link from your latest notification.',
+    testNote: 'This is your test alert. Feel free to try the reply.',
+    escalated:
+      'Your emergency contact has already been notified. The person still sees your reply.',
+    loading: 'Loading …',
+  },
+  contacts: {
+    title: 'Emergency contacts',
+    intro:
+      'If you do not respond to an urgent alert, we tell your emergency contact by e-mail. They only learn what is wrong and which vehicle it is.',
+    toAccount: '← Back to account',
+    manage: 'Manage emergency contacts',
+    summary:
+      '{count, plural, =0 {No emergency contact yet} one {# emergency contact} other {# emergency contacts}}',
+    none: 'No emergency contact yet.',
+    statusPending: 'Waiting for consent until {date, date, medium}',
+    statusConfirmed: 'Confirmed',
+    statusDeclined: 'Declined',
+    allVehicles: 'All vehicles',
+    forVehicle: 'For “{nickname}”',
+    remove: 'Remove',
+    removeLabel: 'Remove emergency contact: {name}',
+    addTitle: 'Invite an emergency contact',
+    name: 'Contact’s name',
+    email: 'Contact’s e-mail address',
+    vehicle: 'For which vehicle?',
+    ownerName: 'Your name',
+    ownerNameHint: 'Shown in the invitation so the contact knows who is asking.',
+    invite: 'Send invitation',
+    invited: 'Invitation sent. The contact becomes active only once {name} agrees.',
+    limitReached:
+      'Your {plan} plan allows {limit, plural, one {# emergency contact} other {# emergency contacts}}. Remove one to invite someone else.',
+    noSubscription: 'Emergency contacts come with an active subscription.',
+    exists: 'This person has already been invited.',
+    self: 'Please invite someone else, not yourself.',
+    howItWorks:
+      'Only for “Vehicle is blocking an exit”, “Window open”, “Damage” and “About to be towed”, and only if you do not respond or reply “I’m not nearby”.',
+  },
+  invitation: {
+    title: 'Invitation as an emergency contact',
+    ask: '{owner} would like to add you as an emergency contact on ParkShield.',
+    explain1:
+      'Anyone who notices a problem with {vehicle, select, all {{owner}’s car} other {the vehicle “{vehicle}”}} notifies the driver anonymously through ParkShield.',
+    explain2:
+      'If the driver does not respond to an urgent problem, we send you an e-mail: what is wrong and which vehicle it is. Nothing more.',
+    explain3: 'You can opt out at any time with this link.',
+    accept: 'Agree',
+    decline: 'Decline',
+    accepted: 'Thank you! You are now an emergency contact for {owner}.',
+    declined: 'You declined. We delete your address within 14 days at the latest.',
+    confirmedState: 'You are an emergency contact for {owner}.',
+    withdraw: 'Opt out as emergency contact',
+    withdrawn: 'You have opted out. We deleted your address and told {owner}.',
+    invalid: 'This invitation no longer exists. It may have been withdrawn or have expired.',
   },
   vehicles: {
     title: 'Vehicles',
