@@ -10,7 +10,7 @@
     repo: 'deb [signed-by=/etc/apt/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main'
     filename: pgdg
 
-- name: Install PostgreSQL {{ postgres_version }} and pgBackRest
+- name: Install PostgreSQL and pgBackRest (version {{ postgres_version }})
   ansible.builtin.apt:
     name: ['postgresql-{{ postgres_version }}', pgbackrest, python3-psycopg2]
     state: present
@@ -58,7 +58,7 @@
     owner: postgres
   notify: Reload postgres
 
-- name: pgBackRest configuration (S3 repo, AES-256 client-side encryption, 35-day retention)
+- name: Configure pgBackRest (S3 repo, AES-256 client-side encryption, 35-day retention)
   ansible.builtin.template:
     src: pgbackrest.conf.j2
     dest: /etc/pgbackrest.conf
@@ -71,14 +71,16 @@
   block:
     - name: Create pgBackRest stanza
       ansible.builtin.command: pgbackrest --stanza=main stanza-create
+      become: true
       become_user: postgres
-      register: stanza
-      changed_when: "'completed successfully' in stanza.stdout"
+      register: postgres_stanza
+      changed_when: "'completed successfully' in postgres_stanza.stdout"
 
     - name: Application role
       community.postgresql.postgresql_user:
         name: '{{ postgres_app_user }}'
         password: '{{ postgres_app_password }}'
+      become: true
       become_user: postgres
       no_log: true
 
@@ -86,6 +88,7 @@
       community.postgresql.postgresql_db:
         name: '{{ postgres_db }}'
         owner: '{{ postgres_app_user }}'
+      become: true
       become_user: postgres
 
     # US-43 / AD-18: the migration creates metabase_ro (NOLOGIN) and grants it the metrics views
@@ -95,6 +98,7 @@
         name: '{{ postgres_metabase_user }}'
         password: '{{ postgres_metabase_password }}'
         role_attr_flags: LOGIN,NOSUPERUSER,NOCREATEDB,NOCREATEROLE
+      become: true
       become_user: postgres
       no_log: true
 
@@ -103,6 +107,7 @@
         name: replicator
         password: '{{ postgres_replication_password }}'
         role_attr_flags: REPLICATION
+      become: true
       become_user: postgres
       no_log: true
 
@@ -131,5 +136,6 @@
   ansible.builtin.command:
     cmd: pgbackrest --stanza=main --type=standby --delta restore
     creates: '/var/lib/postgresql/{{ postgres_version }}/main/standby.signal'
+  become: true
   become_user: postgres
   notify: Restart postgres
