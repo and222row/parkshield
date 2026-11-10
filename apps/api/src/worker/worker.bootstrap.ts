@@ -1,5 +1,9 @@
 import { Inject, Injectable, type OnApplicationBootstrap } from '@nestjs/common';
+import { sql } from 'kysely';
 import { BillingService } from '../billing/billing.service';
+import type { Db } from '../core/core.module';
+import { DB } from '../core/tokens';
+import { PrivacyService } from '../privacy/privacy.service';
 import { DispatchService } from '../notifications/dispatch.service';
 import { ESCALATE_TOPIC, EscalationService } from '../notifications/escalation.service';
 import { OrdersService, PRINT_TOPIC } from '../orders/orders.service';
@@ -21,6 +25,8 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
     @Inject(DispatchService) private readonly dispatch: DispatchService,
     @Inject(EscalationService) private readonly escalation: EscalationService,
     @Inject(RemindersService) private readonly reminders: RemindersService,
+    @Inject(PrivacyService) private readonly privacy: PrivacyService,
+    @Inject(DB) private readonly db: Db,
   ) {}
 
   onApplicationBootstrap() {
@@ -40,6 +46,22 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
       everyMs: HOUR,
       quiet: true,
       run: () => this.reminders.runAll(),
+    });
+    // US-33: the retention schedule (docs 04 §retention), all rules in one SQL function.
+    this.scheduler.every({
+      name: 'retention',
+      everyMs: HOUR,
+      run: async () => {
+        await sql`SELECT run_retention()`.execute(this.db);
+        return 'ok';
+      },
+    });
+    // US-32: accounts whose 24 h grace period is over: processor steps, then the database.
+    this.scheduler.every({
+      name: 'accounts.delete',
+      everyMs: 10 * 60_000,
+      quiet: true,
+      run: () => this.privacy.processDue(),
     });
     // Escalations fall due at escalate_at; the sweeper picks them up within seconds (02-arch §3 step 8).
     this.scheduler.every({

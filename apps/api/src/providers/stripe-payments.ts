@@ -61,6 +61,23 @@ export class StripePayments implements Payments {
     return c.id;
   }
 
+  /**
+   * GDPR erasure at Stripe (AD-11): deleting the customer cancels open subscriptions at once and removes
+   * payment methods. Invoices stay with Stripe for the statutory retention (§ 147 AO).
+   */
+  async deleteCustomer(customerId: string): Promise<{ reference: string }> {
+    try {
+      const r = await this.stripe.customers.del(customerId);
+      return { reference: `stripe:${r.id}:deleted` };
+    } catch (err) {
+      // Already deleted (e.g. a retried step) counts as done.
+      if ((err as { code?: string }).code === 'resource_missing') {
+        return { reference: `stripe:${customerId}:missing` };
+      }
+      throw err;
+    }
+  }
+
   async createCheckout(req: CheckoutRequest): Promise<{ id: string; url: string }> {
     const price = this.prices[req.plan];
     if (!price) throw new Error(`No Stripe price configured for plan ${req.plan}`);

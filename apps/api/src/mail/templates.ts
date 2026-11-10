@@ -190,6 +190,31 @@ const templates = {
       ],
       action: 'Push einschalten',
     },
+    deletion_requested: {
+      subject: 'Ihr ParkShield-Konto wird gelöscht',
+      lines: [
+        'Wir löschen Ihr Konto und alle Daten am {due, date, long} um {due, time, short} Uhr. Ihre Aufkleber funktionieren ab sofort nicht mehr.',
+        'Bis dahin können Sie die Löschung mit dem Link unten abbrechen. Die Aufkleber-Codes bleiben gesperrt; neue stellen Sie im Konto aus.',
+        'Rechnungen bewahrt unser Zahlungsdienstleister Stripe auf, weil das Gesetz es verlangt (8 Jahre).',
+      ],
+      action: 'Löschung abbrechen',
+    },
+    account_deleted: {
+      subject: 'Ihr ParkShield-Konto ist gelöscht',
+      lines: [
+        'Wir haben Ihr Konto und Ihre Daten gelöscht. Aus unseren verschlüsselten Sicherungen verschwinden sie spätestens nach 35 Tagen.',
+        'Danke, dass Sie ParkShield genutzt haben.',
+      ],
+    },
+    staff_invite: {
+      subject: 'Ihr Zugang zu ParkShield Ops',
+      lines: [
+        'Hallo {name},',
+        'für Sie wurde ein Zugang zur ParkShield-Ops-App angelegt. Richten Sie innerhalb von 72 Stunden einen Passkey ein. Der Link funktioniert nur im VPN.',
+        'Passwörter gibt es nicht. Wenn Sie diesen Zugang nicht erwartet haben, melden Sie sich bitte sofort beim Security-Team.',
+      ],
+      action: 'Passkey einrichten',
+    },
   },
   en: {
     magic_link: {
@@ -371,6 +396,31 @@ const templates = {
         'Until the end of the month, alerts reach you by push and e-mail. Turn on push if you have not yet.',
       ],
       action: 'Turn on push',
+    },
+    deletion_requested: {
+      subject: 'Your ParkShield account will be deleted',
+      lines: [
+        'We will delete your account and all data on {due, date, long} at {due, time, short}. Your decals stop working now.',
+        'Until then you can cancel the deletion with the link below. The decal codes stay revoked; you can issue new ones in your account.',
+        'Invoices are kept by our payment provider Stripe because the law requires it (8 years).',
+      ],
+      action: 'Cancel deletion',
+    },
+    account_deleted: {
+      subject: 'Your ParkShield account has been deleted',
+      lines: [
+        'We have deleted your account and your data. They disappear from our encrypted backups within 35 days at the latest.',
+        'Thank you for using ParkShield.',
+      ],
+    },
+    staff_invite: {
+      subject: 'Your access to ParkShield Ops',
+      lines: [
+        'Hello {name},',
+        'an account for the ParkShield ops app has been created for you. Set up a passkey within 72 hours. The link only works on the VPN.',
+        'There are no passwords. If you did not expect this access, please tell the security team at once.',
+      ],
+      action: 'Set up passkey',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

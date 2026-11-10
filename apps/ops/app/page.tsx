@@ -1,18 +1,11 @@
-import { ApiStatus } from './api-status';
+import { redirect } from 'next/navigation';
+import { opsServer, type StaffMe } from '@/lib/server';
+import { Dashboard } from './dashboard';
 
 export const dynamic = 'force-dynamic';
 
-async function opsApiReachable(): Promise<boolean> {
-  const host = process.env.OPS_API_HOST ?? '127.0.0.1';
-  const port = process.env.OPS_API_PORT ?? '4001';
-  try {
-    const res = await fetch(`http://${host}:${port}/ops/v1/health`, { cache: 'no-store' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 export default async function OpsHome() {
-  return <ApiStatus reachable={await opsApiReachable()} />;
+  const me = await opsServer<StaffMe>('/ops/v1/me');
+  if (me.status === 401 || !me.data) redirect('/anmelden');
+  return <Dashboard me={me.data} />;
 }

@@ -30,6 +30,10 @@ export class FakePayments implements Payments {
     return `cus_fake_${randomToken(9)}`;
   }
 
+  async deleteCustomer(customerId: string): Promise<{ reference: string }> {
+    return { reference: `fake-deleted:${customerId}` };
+  }
+
   private async store(session: FakeSession): Promise<{ id: string; url: string }> {
     await this.valkey.set(key('session', session.id), JSON.stringify(session), 'EX', 3600);
     return {

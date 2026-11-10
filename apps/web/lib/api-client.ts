@@ -38,6 +38,28 @@ export async function api<T = unknown>(
   return data as T;
 }
 
+/** POSTs and saves the response as a file (data export). Throws ApiError like api(). */
+export async function downloadPost(path: string, filename: string): Promise<void> {
+  const csrf = csrfToken();
+  const res = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: csrf ? { 'x-csrf-token': csrf } : {},
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, (await res.json().catch(() => null)) as ApiError['body']);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 /** User-facing message for an API error. */
 export function errorText(err: unknown, t: Translate): string {
   if (err instanceof ApiError) {

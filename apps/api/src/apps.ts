@@ -4,7 +4,15 @@ import type { Logger } from 'pino';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { CsrfGuard, SessionGuard } from './auth/guards';
-import { PasskeyService } from './auth/passkey.service';
+import { PasskeyService, StaffPasskeyService } from './auth/passkey.service';
+import { HistoryController } from './history/history.controller';
+import { HistoryService } from './history/history.service';
+import { OpsAuthController } from './ops/ops-auth.controller';
+import { OpsStaffController } from './ops/ops-staff.controller';
+import { StaffGuard } from './ops/staff.guard';
+import { StaffService } from './ops/staff.service';
+import { PrivacyController } from './privacy/privacy.controller';
+import { PrivacyService } from './privacy/privacy.service';
 import { SessionService } from './auth/session.service';
 import { BillingController, StripeWebhookController } from './billing/billing.controller';
 import { BillingService } from './billing/billing.service';
@@ -68,6 +76,9 @@ const domainProviders = [
   PreferencesService,
   FairUseService,
   RemindersService,
+  SessionService,
+  HistoryService,
+  PrivacyService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -94,12 +105,13 @@ export class PublicAppModule {
         AckController,
         EmergencyContactsController,
         EmergencyContactInvitationsController,
+        HistoryController,
+        PrivacyController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [
         ...sharedProviders,
         ...domainProviders,
-        SessionService,
         SessionGuard,
         AuthService,
         PasskeyService,
@@ -116,8 +128,14 @@ export class OpsAppModule {
     return {
       module: OpsAppModule,
       imports: [CoreModule.forRoot(env, logger), ProvidersModule.forRoot(env)],
-      controllers: [OpsHealthController],
-      providers: [...sharedProviders],
+      controllers: [OpsHealthController, OpsAuthController, OpsStaffController],
+      providers: [
+        ...sharedProviders,
+        StaffService,
+        StaffPasskeyService,
+        // Fails closed: every ops route must declare its access policy (US-34).
+        { provide: APP_GUARD, useClass: StaffGuard },
+      ],
     };
   }
 }

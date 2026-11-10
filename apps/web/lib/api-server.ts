@@ -82,6 +82,44 @@ export interface Protection {
   steps: { email: boolean; channel: boolean; contact: boolean; decal: boolean };
 }
 
+export interface HistoryAlert {
+  id: string;
+  vehicle: { id: string; nickname: string };
+  type: { code: string; de: string; en: string };
+  severity: string;
+  isTest: boolean;
+  status: string;
+  ownerReply: 'coming' | 'in_30_min' | 'not_nearby' | null;
+  createdAt: string;
+  message: string | null;
+  muted: 'quiet_hours' | 'sensitive_spot' | null;
+  deliveries: { channel: string; status: string; reason: string | null }[];
+  reported: boolean;
+  canBlock: boolean;
+}
+
+export interface DeliveryHelp {
+  attempts: {
+    alertId: string;
+    at: string;
+    nickname: string;
+    type: { de: string; en: string };
+    isTest: boolean;
+    channel: string;
+    status: string;
+    reason: string | null;
+  }[];
+  setup: {
+    pushDevices: number;
+    pushFailing: number;
+    whatsapp: boolean;
+    quietHours: number;
+    decalTested: boolean;
+    switchedOff: string[];
+    whatsappUsage: { used: number; limit: number };
+  };
+}
+
 export interface Usage {
   whatsapp: { used: number; limit: number };
 }

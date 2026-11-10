@@ -56,8 +56,9 @@ test('touch targets are at least 48 px (SC-12)', async ({ page }) => {
   }
 });
 
-test('ops app shows the ops API as reachable', async ({ page }) => {
+test('ops app asks for a passkey sign-in (US-34)', async ({ page }) => {
   await page.goto(OPS_URL);
-  await expect(page.getByRole('heading', { name: 'ParkShield Ops' })).toBeVisible();
-  await expect(page.getByText('Erreichbar', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/anmelden$/);
+  await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mit Passkey anmelden' })).toBeVisible();
 });

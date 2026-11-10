@@ -159,6 +159,31 @@ export function AccountView({
             </Link>
           </Card>
 
+          <Card>
+            <Stack gap={2}>
+              <Heading level={2} className="text-xl">
+                {t('history.title')}
+              </Heading>
+              <ul className="flex flex-col gap-1">
+                <li>
+                  <Link href="/konto/verlauf" className="text-primary underline">
+                    {t('history.manage')}
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/konto/zustellung" className="text-primary underline">
+                    {t('deliveryHelp.link')}
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/konto/daten" className="text-primary underline">
+                    {t('privacy.manage')}
+                  </Link>
+                </li>
+              </ul>
+            </Stack>
+          </Card>
+
           {subscription && (
             <Card className="flex flex-wrap items-center justify-between gap-3">
               <div>

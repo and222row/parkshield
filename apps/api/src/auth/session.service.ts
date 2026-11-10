@@ -11,7 +11,12 @@ export interface AuthContext {
   email: string;
   preferredLang: 'de' | 'en';
   kind: 'customer' | 'staff';
+  /** When this session was created; export and deletion need a recent sign-in (US-32). */
+  signedInAt: Date;
 }
+
+/** "Fresh re-authentication" window for export and account deletion. */
+export const RECENT_AUTH_MINUTES = 15;
 
 export interface NewSession {
   token: string;
@@ -43,7 +48,14 @@ export class SessionService {
     const row = await this.db
       .selectFrom('sessions as s')
       .innerJoin('users as u', 'u.id', 's.user_id')
-      .select(['s.id as sessionId', 'u.id as userId', 'u.email', 'u.preferred_lang', 'u.kind'])
+      .select([
+        's.id as sessionId',
+        's.created_at as signedInAt',
+        'u.id as userId',
+        'u.email',
+        'u.preferred_lang',
+        'u.kind',
+      ])
       .where('s.token_hash', '=', sha256(token))
       .where('s.revoked_at', 'is', null)
       .where('s.expires_at', '>', sql<Date>`now()`)
@@ -57,7 +69,18 @@ export class SessionService {
       email: row.email,
       preferredLang: row.preferred_lang,
       kind: row.kind,
+      signedInAt: row.signedInAt,
     };
+  }
+
+  /** Ends every session of a user (account deletion). */
+  async revokeAll(userId: string): Promise<void> {
+    await this.db
+      .updateTable('sessions')
+      .set({ revoked_at: sql`now()` })
+      .where('user_id', '=', userId)
+      .where('revoked_at', 'is', null)
+      .execute();
   }
 
   async revoke(sessionId: string): Promise<void> {

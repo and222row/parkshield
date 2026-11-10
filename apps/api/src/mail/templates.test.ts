@@ -32,6 +32,8 @@ const values = {
   used: 8,
   limit: 10,
   channel: 'WhatsApp',
+  due: new Date('2027-08-04T09:15:00Z'),
+  name: 'Anna',
 };
 
 describe('mail templates', () => {

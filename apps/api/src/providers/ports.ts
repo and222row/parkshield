@@ -143,6 +143,8 @@ export type BillingEvent =
 
 export interface Payments {
   ensureCustomer(input: { email: string; userId: string; locale: 'de' | 'en' }): Promise<string>;
+  /** Account deletion: removes the customer and cancels subscriptions immediately. Idempotent. */
+  deleteCustomer(customerId: string): Promise<{ reference: string }>;
   createCheckout(req: CheckoutRequest): Promise<{ id: string; url: string }>;
   createPaymentCheckout(req: PaymentCheckoutRequest): Promise<{ id: string; url: string }>;
   /** Ends the subscription at `at`, or at the end of the current period when `at` is null. */
