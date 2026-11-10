@@ -137,10 +137,11 @@ jobs:
       - name: ansible-lint
         working-directory: infra/ansible
         run: |
-          # Into the project: the runner's system Ansible already has them, but ansible-lint's own
-          # (pipx) Ansible cannot see that copy.
-          ansible-galaxy collection install -r requirements.yml -p collections --force
-          ANSIBLE_COLLECTIONS_PATH="$PWD/collections" ansible-lint
+          # The runner's system Ansible already has them, but ansible-lint's own (pipx) Ansible cannot
+          # see that copy. Install outside the repo, or ansible-lint would lint the collections too.
+          collections="$RUNNER_TEMP/ansible-collections"
+          ansible-galaxy collection install -r requirements.yml -p "$collections" --force
+          ANSIBLE_COLLECTIONS_PATH="$collections" ansible-lint
 
   deploy-staging:
     name: Deploy to staging
