@@ -2,6 +2,9 @@
 
 QR decal that lets anyone alert a car owner without seeing their phone number. Specs: [`docs/`](docs/README.md).
 
+**New here (human or AI agent)? Start with [`AGENTS.md`](AGENTS.md)**: project overview, layout, how
+to run/test/build/deploy, hard rules, known traps and the open to-do list.
+
 ## Local development (Windows, macOS, Linux)
 
 Requirements: Node.js 24+, and a Redis-compatible server on `VALKEY_URL` (Windows: Memurai Developer on port 6380; macOS/Linux: `valkey-server`). PostgreSQL 18 runs embedded from npm, with no install.
