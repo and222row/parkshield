@@ -193,7 +193,14 @@ const de: Record<LegalSlug, LegalDoc> = {
       {
         heading: 'Stand der Vereinbarkeit',
         paragraphs: [
-          'Wir möchten ParkShield für alle nutzbar machen und richten uns nach WCAG 2.2 Stufe AA sowie dem Barrierefreiheitsstärkungsgesetz. Jede Änderung wird automatisch auf Barrieren geprüft; vor dem Start folgt eine unabhängige Prüfung. Bekannte Barrieren: derzeit keine.',
+          'Wir möchten ParkShield für alle nutzbar machen und richten uns nach WCAG 2.2 Stufe AA sowie dem Barrierefreiheitsstärkungsgesetz (BFSG). Nach unserer eigenen Prüfung erfüllen die Website, das Kundenkonto und die Scan-Seite diese Anforderungen. Bekannte Barrieren: derzeit keine.',
+        ],
+      },
+      {
+        heading: 'Wie wir prüfen',
+        paragraphs: [
+          'Stand: 10. November 2026. Jede Seite wird bei jeder Änderung automatisch geprüft, auf Deutsch und Englisch: WCAG-2.2-AA-Regeln, Darstellung auf 320 Pixel breiten Bildschirmen und bei 200 % Vergrößerung ohne waagerechtes Scrollen, vergrößerte Zeilen- und Zeichenabstände, reduzierte Bewegung und die wichtigsten Abläufe (Anmelden, Warnung senden) nur mit der Tastatur, mit sichtbarem Fokus.',
+          'Vor dem Start prüft eine unabhängige Stelle zusätzlich mit Screenreadern und mit Menschen mit Behinderungen; diese Erklärung wird danach aktualisiert.',
         ],
       },
       {
@@ -304,7 +311,20 @@ const en: Record<LegalSlug, LegalDoc> = {
       {
         heading: 'Status',
         paragraphs: [
-          `We follow WCAG 2.2 level AA and test every change automatically. Report barriers to ${CONTACT}; we reply within 14 days. Market surveillance: MLBF, Magdeburg.`,
+          'We want ParkShield to work for everyone and follow WCAG 2.2 level AA and the German Accessibility Strengthening Act (BFSG). By our own assessment the website, the customer account and the scanner page meet these requirements. Known barriers: none at the moment.',
+        ],
+      },
+      {
+        heading: 'How we test',
+        paragraphs: [
+          'As of 10 November 2026. Every page is checked automatically on every change, in German and English: WCAG 2.2 AA rules, display on 320-pixel-wide screens and at 200 % zoom without horizontal scrolling, increased line and letter spacing, reduced motion, and the main flows (signing in, sending an alert) with the keyboard only and a visible focus.',
+          'Before launch an independent body also tests with screen readers and with people with disabilities; this statement will be updated afterwards.',
+        ],
+      },
+      {
+        heading: 'Report a barrier',
+        paragraphs: [
+          `Have you found a barrier? Write to ${CONTACT}; we reply within 14 days. Market surveillance: MLBF, Magdeburg.`,
         ],
       },
     ],

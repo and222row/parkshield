@@ -451,6 +451,7 @@ export interface OutboxEvents {
   attempts: Generated<number>;
   available_at: Generated<Timestamp>;
   id: Generated<Int8>;
+  locked_until: Timestamp | null;
   payload: Json;
   processed_at: Timestamp | null;
   topic: string;
@@ -606,6 +607,15 @@ export interface Sessions {
   token_hash: Buffer;
   user_agent: string | null;
   user_id: string;
+}
+
+export interface StaffAccessReviews {
+  id: Generated<string>;
+  kept: number;
+  note: string;
+  removed: number;
+  reviewed_at: Generated<Timestamp>;
+  reviewed_by: string | null;
 }
 
 export interface StaffRoleAssignments {
@@ -792,6 +802,7 @@ export interface DB {
   scanner_blocks: ScannerBlocks;
   schema_migrations: SchemaMigrations;
   sessions: Sessions;
+  staff_access_reviews: StaffAccessReviews;
   staff_role_assignments: StaffRoleAssignments;
   staff_role_permissions: StaffRolePermissions;
   staff_roles: StaffRoles;

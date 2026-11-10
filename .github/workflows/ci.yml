@@ -129,6 +129,9 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check -recursive
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
+      - run: terraform -chdir=infra/monitoring fmt -check -recursive
+      - run: terraform -chdir=infra/monitoring init -backend=false
+      - run: terraform -chdir=infra/monitoring validate
       - run: pipx run --spec ansible-lint ansible-lint infra/ansible
 
   deploy-staging:

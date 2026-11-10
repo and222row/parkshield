@@ -60,7 +60,8 @@ export function DsrQueue({ me, initial }: { me: StaffMe; initial: DsrList | null
             {list.map((r) => (
               <li key={r.id}>
                 <Card className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
+                  {/* min-w-0: a flex item never shrinks below its longest word otherwise (320 px reflow) */}
+                  <div className="min-w-0">
                     <p className="font-semibold">
                       {t(`opsDsr.type_${r.type}` as MessageKey)} ·{' '}
                       {r.email ?? t('opsDsr.accountGone')}

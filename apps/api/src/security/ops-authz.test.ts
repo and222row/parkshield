@@ -113,7 +113,11 @@ async function call(r: Route, who?: { cookie: string; csrf: string }, csrf = tru
     headers: who ? { cookie: who.cookie, ...(csrf ? { 'x-csrf-token': who.csrf } : {}) } : {},
     ...(r.method === 'GET' || r.method === 'HEAD' ? {} : { payload: {} }),
   });
-  return { status: res.statusCode, error: (res.json() as { error?: string } | null)?.error };
+  const json = String(res.headers['content-type'] ?? '').includes('application/json');
+  return {
+    status: res.statusCode,
+    error: json ? (res.json() as { error?: string } | null)?.error : undefined,
+  };
 }
 
 describe('api-ops authorisation matrix (US-45, ASVS 4.1–4.2)', () => {

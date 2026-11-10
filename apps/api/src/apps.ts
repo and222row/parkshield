@@ -30,6 +30,7 @@ import {
   OpsSettingsController,
 } from './ops/ops-back-office.controller';
 import { AuditStreamService, AuditViewService } from './ops/audit.service';
+import { AccessReviewService } from './ops/access-review.service';
 import { FulfilmentService } from './ops/fulfilment.service';
 import { PromoService } from './ops/promo.service';
 import { ProviderHealthService } from './ops/provider-health.service';
@@ -124,6 +125,7 @@ const opsProviders = [
   ProviderHealthService,
   AuditStreamService,
   AuditViewService,
+  AccessReviewService,
 ];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
@@ -217,6 +219,7 @@ export class WorkerModule {
         DsrService,
         ProviderHealthService,
         AuditStreamService,
+        AccessReviewService,
         OutboxService,
         SchedulerService,
         WorkerBootstrap,

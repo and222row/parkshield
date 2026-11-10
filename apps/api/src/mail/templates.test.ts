@@ -41,6 +41,7 @@ const values = {
   amount: '7,42 €',
   creditNote: 'GS-2027-000001',
   ended: 'yes',
+  days: 90,
   list: 'whatsapp.quality: CRITICAL (RED)',
 };
 

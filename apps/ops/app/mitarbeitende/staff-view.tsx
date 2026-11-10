@@ -13,6 +13,7 @@ import {
   Text,
   useI18n,
 } from '@parkshield/ui';
+import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { OpsShell } from '@/components/ops-shell';
 import { opsApi, OpsApiError } from '@/lib/api';
@@ -72,6 +73,9 @@ export function StaffView({ me, list: initial }: { me: StaffMe; list: StaffList 
         <div>
           <Heading level={1}>{t('ops.staffTitle')}</Heading>
           <Text muted>{t('ops.staffIntro')}</Text>
+          <Link href="/mitarbeitende/pruefung" className="text-primary underline">
+            {t('opsAccess.link')}
+          </Link>
         </div>
         {!list ? (
           <Notice tone="danger">{t('ops.forbidden')}</Notice>

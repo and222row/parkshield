@@ -51,6 +51,8 @@ export const envSchema = z.object({
   ZAMMAD_URL: z.string().default(''),
   ZAMMAD_TOKEN: z.string().default(''),
   ZAMMAD_GROUP: z.string().default('Support'),
+  // US-45: Better Stack heartbeat (infra/monitoring output worker_heartbeat_url); empty: no heartbeat.
+  HEARTBEAT_URL_WORKER: z.string().default(''),
 });
 
 /** Providers without keys fall back to local fakes, which are never allowed in production. */

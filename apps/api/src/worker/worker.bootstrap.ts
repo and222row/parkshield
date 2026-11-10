@@ -1,8 +1,10 @@
 import { Inject, Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 import { sql } from 'kysely';
 import { BillingService } from '../billing/billing.service';
+import type { Env } from '../config/env';
 import type { Db } from '../core/core.module';
-import { DB } from '../core/tokens';
+import { DB, ENV } from '../core/tokens';
+import { AccessReviewService } from '../ops/access-review.service';
 import { AuditStreamService } from '../ops/audit.service';
 import { DsrService } from '../ops/dsr.service';
 import { ProviderHealthService } from '../ops/provider-health.service';
@@ -32,7 +34,9 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
     @Inject(DsrService) private readonly dsr: DsrService,
     @Inject(AuditStreamService) private readonly audit: AuditStreamService,
     @Inject(ProviderHealthService) private readonly health: ProviderHealthService,
+    @Inject(AccessReviewService) private readonly access: AccessReviewService,
     @Inject(DB) private readonly db: Db,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   onApplicationBootstrap() {
@@ -89,6 +93,39 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
       everyMs: 5 * 60_000,
       quiet: true,
       run: () => this.health.evaluate(),
+    });
+    // US-45 monitoring: report in to Better Stack, but only while the queue keeps moving, so a worker
+    // that runs but is stuck (database down, handlers failing) pages the on-call person too.
+    if (this.env.HEARTBEAT_URL_WORKER) {
+      this.scheduler.every({
+        name: 'heartbeat',
+        everyMs: 60_000,
+        quiet: true,
+        run: async () => {
+          const { n } = await this.db
+            .selectFrom('outbox_events')
+            .select((eb) => eb.fn.countAll<string>().as('n'))
+            .where('processed_at', 'is', null)
+            .where('attempts', '<', 10)
+            .where('available_at', '<', sql<Date>`now() - interval '2 minutes'`)
+            .executeTakeFirstOrThrow();
+          if (Number(n) > 0) return `stuck: ${n} events older than 2 min`;
+          await fetch(this.env.HEARTBEAT_URL_WORKER, { signal: AbortSignal.timeout(10_000) });
+          return 'ok';
+        },
+      });
+    }
+    // US-45 permission review: inactive staff lose their roles; a weekly reminder while a review is due.
+    this.scheduler.every({
+      name: 'staff.expire',
+      everyMs: 6 * HOUR,
+      run: () => this.access.expireInactive(),
+    });
+    this.scheduler.every({
+      name: 'staff.review_remind',
+      everyMs: 6 * HOUR,
+      quiet: true,
+      run: () => this.access.remindDue(),
     });
     // Escalations fall due at escalate_at; the sweeper picks them up within seconds (02-arch §3 step 8).
     this.scheduler.every({

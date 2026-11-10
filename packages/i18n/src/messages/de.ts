@@ -14,6 +14,9 @@ const de = {
     cancel: 'Abbrechen',
     required: 'Pflichtfeld',
     optional: 'optional',
+    notFoundTitle: 'Diese Seite gibt es nicht',
+    notFoundText: 'Der Link ist falsch oder veraltet.',
+    notFoundBack: 'Zur Startseite',
     footer: {
       help: 'Hilfe und Kontakt',
       impressum: 'Impressum',
@@ -1356,6 +1359,8 @@ const de = {
     k_reminders_decal_health_months: 'Aufkleber-Check nach (Monaten)',
     k_ops_alert_email: 'E-Mail-Adresse für Team-Alarme',
     k_support_reply_hours_plus: 'Antwortzeit für Plus (Stunden)',
+    k_staff_inactive_days: 'Ops-Rollen entziehen nach (Tagen ohne Anmeldung)',
+    k_staff_review_interval_days: 'Zugriffsprüfung alle (Tage)',
   },
   opsHealth: {
     title: 'Anbieter-Status',
@@ -1405,6 +1410,31 @@ const de = {
     read: 'Lesezugriff',
     system: 'System',
     older: 'Ältere Einträge',
+  },
+  opsAccess: {
+    link: 'Vierteljährliche Zugriffsprüfung',
+    back: 'Zu den Mitarbeitenden',
+    title: 'Zugriffsprüfung',
+    intro:
+      'Bestätigen oder entziehen Sie jeden Ops-Zugang. Wer sich {days} Tage nicht anmeldet, verliert seine Rollen automatisch.',
+    lastReview: 'Letzte Prüfung am {date} durch {by}: {kept} behalten, {removed} entzogen.',
+    never: 'Es gab noch keine Prüfung.',
+    dueNow: 'Die Prüfung ist jetzt fällig.',
+    dueOn: 'Nächste Prüfung fällig am {date}.',
+    csv: 'Bericht als CSV herunterladen',
+    list: 'Zugänge',
+    noPasskey: 'kein Passkey',
+    inactive: 'seit {days} Tagen nicht angemeldet',
+    lastLogin: 'Letzte Anmeldung: {date}',
+    permissions: '{count, plural, one {# Berechtigung} other {# Berechtigungen}}',
+    keep: 'Zugang von {name} behalten',
+    note: 'Vermerk zur Prüfung',
+    noteHint:
+      'Mindestens 10 Zeichen, zum Beispiel wer geprüft hat und warum Zugänge entzogen wurden.',
+    willRemove:
+      '{count, plural, one {Einem Zugang werden} other {# Zugängen werden}} alle Rollen entzogen; offene Sitzungen enden sofort.',
+    submit: 'Prüfung abschließen',
+    done: 'Prüfung festgehalten: {kept} behalten, {removed} entzogen.',
   },
   opsZammad: {
     title: 'Kunde zum Ticket',

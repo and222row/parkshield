@@ -52,6 +52,12 @@ export class StaffService {
         expires_at: expiresAt,
       })
       .execute();
+    // Last sign-in for the permission review and the expiry of inactive staff (US-45).
+    await this.db
+      .updateTable('users')
+      .set({ last_login_at: sql`now()` })
+      .where('id', '=', userId)
+      .execute();
     await this.audit(userId, 'staff.login', 'users', userId);
     return { token, csrf: randomToken(18), expiresAt };
   }

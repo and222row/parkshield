@@ -67,6 +67,8 @@ export const SETTINGS: Record<string, Def> = {
     default: 'datenschutz@parkshield.de',
   },
   'support.reply_hours_plus': { group: 'general', schema: int(1, 168), default: 48 },
+  'staff.inactive_days': { group: 'general', schema: int(30, 365), default: 90 },
+  'staff.review_interval_days': { group: 'general', schema: int(30, 180), default: 90 },
 };
 
 export const SETTING_KEYS = Object.keys(SETTINGS);

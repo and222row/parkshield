@@ -275,6 +275,23 @@ const templates = {
       lines: ['{list}', 'Details und Kill Switches stehen in der Ops-App unter „Anbieter“.'],
       action: 'Anbieter-Status öffnen',
     },
+    staff_expired: {
+      subject:
+        '{count, plural, one {Ein Ops-Zugang wurde} other {# Ops-Zugänge wurden}} wegen Inaktivität entzogen',
+      lines: [
+        'Seit {days} Tagen ohne Anmeldung, die Rollen sind entfernt: {list}.',
+        'Wer den Zugang wieder braucht, bekommt die Rollen in der Ops-App unter „Mitarbeitende“ neu.',
+      ],
+      action: 'Zugriffsprüfung öffnen',
+    },
+    staff_review_due: {
+      subject: 'Zugriffsprüfung der Ops-App ist fällig',
+      lines: [
+        'Alle {days} Tage prüfen wir, wer welche Rolle in der Ops-App hat. Die Prüfung ist jetzt fällig.',
+        'Bitte bestätigen oder entziehen Sie jeden Zugang; die Prüfung wird im Audit-Log festgehalten.',
+      ],
+      action: 'Zugriffsprüfung öffnen',
+    },
   },
   en: {
     magic_link: {
@@ -539,6 +556,23 @@ const templates = {
       subject: 'Provider status: {count, plural, one {one change} other {# changes}}',
       lines: ['{list}', 'Details and kill switches are in the ops app under “Providers”.'],
       action: 'Open provider status',
+    },
+    staff_expired: {
+      subject:
+        '{count, plural, one {One ops account} other {# ops accounts}} lost access after inactivity',
+      lines: [
+        'No sign-in for {days} days, the roles were removed: {list}.',
+        'Anyone who needs access again gets the roles back in the ops app under “Staff”.',
+      ],
+      action: 'Open the access review',
+    },
+    staff_review_due: {
+      subject: 'The ops access review is due',
+      lines: [
+        'Every {days} days we check who has which role in the ops app. The review is due now.',
+        'Please confirm or remove each account; the review is recorded in the audit log.',
+      ],
+      action: 'Open the access review',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

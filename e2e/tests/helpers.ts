@@ -87,7 +87,12 @@ export const OPS_URL = process.env.OPS_BASE_URL ?? 'http://localhost:3001';
  * A signed-in staff member in a fresh browser. The passkey ceremony itself is covered in sprint8.spec;
  * here the staff session is created directly, exactly as api-ops would after a passkey sign-in.
  */
-export async function staffBrowser(browser: Browser, name: string, roles: string[]): Promise<Page> {
+export async function staffBrowser(
+  browser: Browser,
+  name: string,
+  roles: string[],
+  options: { locale?: string; viewport?: { width: number; height: number } } = {},
+): Promise<Page> {
   const email = `${name}-${Date.now()}${Math.floor(Math.random() * 1000)}@parkshield.de`;
   const [u] = await sql(
     `INSERT INTO users (email, kind, display_name, email_verified_at) VALUES ($1, 'staff', $2, now()) RETURNING id`,
@@ -101,7 +106,11 @@ export async function staffBrowser(browser: Browser, name: string, roles: string
     `INSERT INTO sessions (user_id, token_hash, is_staff, expires_at) VALUES ($1, $2, true, now() + interval '30 minutes')`,
     [u.id, createHash('sha256').update(token).digest()],
   );
-  const ctx = await browser.newContext({ locale: 'de-DE', baseURL: OPS_URL });
+  const ctx = await browser.newContext({
+    locale: options.locale ?? 'de-DE',
+    baseURL: OPS_URL,
+    ...(options.viewport ? { viewport: options.viewport } : {}),
+  });
   const host = new URL(OPS_URL).hostname;
   await ctx.addCookies([
     {
