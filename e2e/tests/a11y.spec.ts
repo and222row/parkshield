@@ -4,6 +4,7 @@ import {
   linkIn,
   OPS_URL,
   ownerWithActiveDecal,
+  settleAnimations,
   sql,
   staffBrowser,
   uniqueEmail,
@@ -71,6 +72,18 @@ async function audit(page: Page, url: string, problems: string[]) {
   await page.waitForLoadState('networkidle');
   const where = `${new URL(page.url()).host}${url} [${page.viewportSize()?.width}px ${await page.evaluate(() => document.documentElement.lang)}]`;
   if (!res || res.status() >= 500) problems.push(`${where}: HTTP ${res?.status()}`);
+  // Scroll-revealed sections (landing page) stay transparent until seen: scroll through once so
+  // axe checks them too, then wait for the fade-ins to finish.
+  await page.evaluate(async () => {
+    if (!document.querySelector('[data-reveal]')) return;
+    for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) {
+      scrollTo(0, y);
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    scrollTo(0, 0);
+    await new Promise((r) => setTimeout(r, 1200));
+  });
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page })
     .withTags([...WCAG, 'best-practice'])
     // Content outside landmarks: the Next.js dev indicator only exists in `next dev`.

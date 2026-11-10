@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Providers } from '@/components/providers';
 import { requestLocale } from '@/lib/locale';
+// Self-hosted font files (served from /_next/static), so no third-party request (GDPR).
+import '@fontsource-variable/plus-jakarta-sans';
 import './globals.css';
 
 export const metadata: Metadata = {

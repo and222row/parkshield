@@ -66,12 +66,36 @@ export function linkIn(mail: Mail): string {
   return m[1]!;
 }
 
+/** Waits (up to 3 s) for running entrance animations, so axe judges the settled page, not a fade. */
+export async function settleAnimations(page: Page) {
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+      new Promise((r) => setTimeout(r, 3000)),
+    ]),
+  );
+}
+
 export async function expectAccessible(page: Page) {
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page })
     .withTags(WCAG_TAGS)
     .exclude('nextjs-portal')
     .analyze();
-  expect(results.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.length})`)).toEqual([]);
+  expect(
+    results.violations.map(
+      (v) =>
+        `${v.id}: ${v.help} (${v.nodes.length}: ${v.nodes
+          .slice(0, 3)
+          .map((n) => n.target.join(' '))
+          .join(' | ')})`,
+    ),
+  ).toEqual([]);
   // Reflow (WCAG 1.4.10): nothing wider than the screen. On a phone the page would zoom out and every
   // tap would land beside its target. scrollWidth also catches text that overflows its box.
   const { scroll, client } = await page.evaluate(() => ({
