@@ -43,8 +43,16 @@ export class SettingsService implements OnModuleInit, OnModuleDestroy {
     return this.cache.has(key) ? (this.cache.get(key) as T) : fallback;
   }
 
+  private readonly listeners: (() => void)[] = [];
+
+  /** Other caches that must reload together with the settings (e.g. filter word lists). */
+  onChange(listener: () => void): void {
+    this.listeners.push(listener);
+  }
+
   invalidate(): void {
     this.loadedAt = 0;
+    for (const l of this.listeners) l();
   }
 
   /** Tells every process to reload (call after writing app_settings). */

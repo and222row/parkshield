@@ -16,7 +16,9 @@ export default async function VehiclePage({
   const { order } = await searchParams;
   const [vehicle, orders, mode] = await Promise.all([
     serverApi<Vehicle>(`/v1/vehicles/${encodeURIComponent(id)}`),
-    serverApi<{ orders: OrderSummary[]; includedAvailable: boolean }>('/v1/orders'),
+    serverApi<{ orders: OrderSummary[]; includedAvailable: boolean; freeReplacements: number }>(
+      '/v1/orders',
+    ),
     serverApi<{ mode: VehicleMode | null }>(`/v1/vehicles/${encodeURIComponent(id)}/mode`),
   ]);
   if (vehicle.status === 401) redirect('/anmelden');
@@ -27,6 +29,7 @@ export default async function VehiclePage({
       mode={mode.data?.mode ?? null}
       orders={(orders.data?.orders ?? []).filter((o) => o.vehicleId === id)}
       includedAvailable={orders.data?.includedAvailable ?? false}
+      freeReplacements={orders.data?.freeReplacements ?? 0}
       orderResult={order === 'paid' || order === 'canceled' ? order : undefined}
     />
   );

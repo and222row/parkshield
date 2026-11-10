@@ -36,11 +36,12 @@ export class OrdersController {
 
   @Get('orders')
   async list(@CurrentUser() user: AuthContext) {
-    const [orders, includedAvailable] = await Promise.all([
+    const [orders, includedAvailable, freeReplacements] = await Promise.all([
       this.orders.list(user.userId),
       this.orders.includedAvailable(user.userId),
+      this.orders.freeReplacements(user.userId),
     ]);
-    return { orders, includedAvailable };
+    return { orders, includedAvailable, freeReplacements };
   }
 
   @Post('vehicles/:id/order-included')

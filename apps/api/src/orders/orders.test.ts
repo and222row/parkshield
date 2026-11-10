@@ -60,6 +60,7 @@ describe('included decal order (US-11)', () => {
     ).toEqual({
       orders: [],
       includedAvailable: true,
+      freeReplacements: 0,
     });
 
     const res = await order(s, v.id);

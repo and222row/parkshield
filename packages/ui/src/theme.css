@@ -91,6 +91,8 @@
   body {
     font-size: 1rem;
     line-height: 1.5;
+    /* Long e-mail addresses, plates and links break instead of widening the page on a phone. */
+    overflow-wrap: break-word;
   }
   :focus-visible {
     outline: 3px solid var(--ps-focus);

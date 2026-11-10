@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import { BillingService } from '../billing/billing.service';
 import type { Db } from '../core/core.module';
 import { DB } from '../core/tokens';
+import { DsrService } from '../ops/dsr.service';
 import { PrivacyService } from '../privacy/privacy.service';
 import { DispatchService } from '../notifications/dispatch.service';
 import { ESCALATE_TOPIC, EscalationService } from '../notifications/escalation.service';
@@ -26,6 +27,7 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
     @Inject(EscalationService) private readonly escalation: EscalationService,
     @Inject(RemindersService) private readonly reminders: RemindersService,
     @Inject(PrivacyService) private readonly privacy: PrivacyService,
+    @Inject(DsrService) private readonly dsr: DsrService,
     @Inject(DB) private readonly db: Db,
   ) {}
 
@@ -55,6 +57,13 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
         await sql`SELECT run_retention()`.execute(this.db);
         return 'ok';
       },
+    });
+    // US-37: one reminder to the privacy team 7 days before a request's 30-day deadline.
+    this.scheduler.every({
+      name: 'dsr.remind',
+      everyMs: HOUR,
+      quiet: true,
+      run: () => this.dsr.remindDueSoon(),
     });
     // US-32: accounts whose 24 h grace period is over: processor steps, then the database.
     this.scheduler.every({

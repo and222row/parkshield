@@ -41,4 +41,56 @@ export default async function globalSetup() {
   if (stale.length) await valkey.del(...stale);
   await valkey.publish('settings:changed', '1');
   valkey.disconnect();
+
+  await warmUp();
+}
+
+/**
+ * `next dev` compiles each route on its first request. When many tests hit uncompiled routes at once,
+ * compiles queue up and clicks land before hydration. Request every route once, sequentially, first.
+ * (Production builds are precompiled; this only matters locally.)
+ */
+async function warmUp() {
+  const web = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+  const ops = process.env.OPS_BASE_URL ?? 'http://localhost:3001';
+  const id = '00000000-0000-4000-8000-000000000000';
+  const routes = [
+    ...[
+      '/',
+      '/anmelden',
+      '/anmelden/link',
+      '/konto',
+      '/konto/fahrzeuge',
+      `/konto/fahrzeuge/${id}`,
+      '/konto/benachrichtigungen',
+      '/konto/notfallkontakte',
+      '/konto/verlauf',
+      '/konto/zustellung',
+      '/konto/daten',
+      '/antwort',
+      '/notfallkontakt',
+      '/konto-loeschen-abbrechen',
+      '/datenschutz-anfrage',
+      '/dev/checkout',
+      '/s/0000000000',
+    ].map((p) => web + p),
+    ...[
+      '/',
+      '/anmelden',
+      '/einladung',
+      '/kunden',
+      `/kunden/${id}`,
+      `/warnungen/${id}`,
+      '/break-glass',
+      '/datenschutz',
+      `/datenschutz/${id}`,
+      '/missbrauch',
+      '/missbrauch/pruefung',
+      '/missbrauch/woerter',
+      '/mitarbeitende',
+    ].map((p) => ops + p),
+  ];
+  for (const url of routes) {
+    await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(60_000) }).catch(() => {});
+  }
 }

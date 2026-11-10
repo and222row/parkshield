@@ -356,15 +356,19 @@ function RevokeAndReplace({
   vehicle,
   onReissued,
   orderResult,
+  freeReplacement,
 }: {
   vehicle: Vehicle;
   onReissued: (v: Vehicle) => void;
   orderResult?: 'paid' | 'canceled';
+  freeReplacement: boolean;
 }) {
   const { t, locale } = useI18n();
   const [reason, setReason] = useState<(typeof REASONS)[number]>('leaked');
   const [done, setDone] = useState(false);
-  const price = euro(ADDON_PRICES_CENTS.replacementDecal, locale);
+  const price = freeReplacement
+    ? t('replacement.free')
+    : euro(ADDON_PRICES_CENTS.replacementDecal, locale);
 
   async function revoke() {
     if (!window.confirm(t('revoke.confirm'))) return;
@@ -409,7 +413,7 @@ function RevokeAndReplace({
             <Notice tone="warning">{t('replacement.canceled')}</Notice>
           )}
           <AddressForm
-            intro={t('replacement.intro', { price })}
+            intro={freeReplacement ? t('replacement.freeIntro') : t('replacement.intro', { price })}
             submitLabel={t('replacement.submit', { price })}
             onSubmit={async (address) => {
               const { url } = await api<{ url: string }>(
@@ -433,8 +437,10 @@ export function VehicleDetail({
   includedAvailable,
   orderResult,
   mode,
+  freeReplacements = 0,
 }: {
   mode: VehicleMode | null;
+  freeReplacements?: number;
   vehicle: Vehicle;
   orders: OrderSummary[];
   includedAvailable: boolean;
@@ -518,7 +524,12 @@ export function VehicleDetail({
           </Card>
 
           {vehicle.decal && (
-            <RevokeAndReplace vehicle={vehicle} onReissued={setVehicle} orderResult={orderResult} />
+            <RevokeAndReplace
+              vehicle={vehicle}
+              onReissued={setVehicle}
+              orderResult={orderResult}
+              freeReplacement={freeReplacements > 0}
+            />
           )}
 
           <Card>

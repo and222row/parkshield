@@ -74,13 +74,14 @@ export function filterText(
   const norm = normalise(text);
   const squashed = norm.replace(/[^a-z]/g, '');
   const words = norm.split(/[^a-z]+/).filter(Boolean);
-  for (const t of lists.threats ?? DEFAULT_THREATS) {
-    if (norm.includes(t) || squashed.includes(t.replace(/\s/g, '')))
+  // List words go through the same normalisation as the text ("blödmann" from ops matches "Blödmann").
+  for (const t of (lists.threats ?? DEFAULT_THREATS).map(normalise)) {
+    if (norm.includes(t) || squashed.includes(t.replace(/[^a-z]/g, '')))
       return { ok: false, reason: 'threat' };
   }
-  for (const w of lists.insults ?? DEFAULT_INSULTS) {
+  for (const w of (lists.insults ?? DEFAULT_INSULTS).map(normalise)) {
     // Whole words, plus spaced-out spellings ("a r s c h") caught via the squashed form for longer words.
-    if (words.includes(w) || (w.length >= 5 && squashed.includes(w)))
+    if (words.includes(w) || (w.length >= 5 && squashed.includes(w.replace(/[^a-z]/g, ''))))
       return { ok: false, reason: 'insult' };
   }
   return { ok: true };

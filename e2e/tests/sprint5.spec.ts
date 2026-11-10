@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   expect,
   test,
@@ -8,23 +6,7 @@ import {
   type BrowserContext,
   type Page,
 } from '@playwright/test';
-import { config } from 'dotenv';
-import pg from 'pg';
-import { API_URL, expectAccessible, signUp, uniqueEmail, waitForMail } from './helpers';
-
-const envFile = join(import.meta.dirname, '..', '..', '.env');
-if (existsSync(envFile)) config({ path: envFile, quiet: true });
-
-/** Direct DB access stands in for the owner's reply (Sprint 6) and for the clock (2 h expiry). */
-async function sql(text: string, params: unknown[] = []) {
-  const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-  await db.connect();
-  try {
-    return (await db.query(text, params)).rows;
-  } finally {
-    await db.end();
-  }
-}
+import { API_URL, expectAccessible, signUp, sql, uniqueEmail, waitForMail } from './helpers';
 const latestAlert = async (email: string) =>
   (
     await sql(

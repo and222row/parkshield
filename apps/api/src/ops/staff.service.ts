@@ -307,4 +307,26 @@ export class StaffService {
       })
       .execute();
   }
+
+  /** AD-17: reads are audited too (opening a customer, a trace, a decrypted field). */
+  async auditRead(
+    actor: string,
+    action: string,
+    entity: string,
+    entityId: string | null,
+    meta: Record<string, unknown> = {},
+  ) {
+    await this.db
+      .insertInto('audit_logs')
+      .values({
+        actor_id: actor,
+        actor_kind: 'staff',
+        action,
+        is_read: true,
+        entity,
+        entity_id: entityId,
+        meta: JSON.stringify(meta),
+      })
+      .execute();
+  }
 }

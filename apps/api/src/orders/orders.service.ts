@@ -48,6 +48,16 @@ export class OrdersService {
     return !used;
   }
 
+  /** Free replacements granted by ops (AD-08: code revoked on the owner's behalf). */
+  async freeReplacements(userId: string): Promise<number> {
+    const u = await this.db
+      .selectFrom('users')
+      .select('free_replacements')
+      .where('id', '=', userId)
+      .executeTakeFirst();
+    return u?.free_replacements ?? 0;
+  }
+
   async orderIncluded(userId: string, vehicleId: string, address: ShippingAddress) {
     await this.entitlements.require(userId);
     const { token, vehicle } = await this.vehicles.currentToken(userId, vehicleId);
@@ -114,9 +124,51 @@ export class OrdersService {
     const { token } = await this.vehicles.currentToken(userId, vehicleId);
     const user = await this.db
       .selectFrom('users')
-      .select('stripe_customer_id')
+      .select(['stripe_customer_id', 'free_replacements'])
       .where('id', '=', userId)
       .executeTakeFirstOrThrow();
+    const back = `${this.env.WEB_BASE_URL}/konto/fahrzeuge/${vehicleId}`;
+
+    // AD-08: after ops revoked a code on the owner's behalf, the replacement is free.
+    if (user.free_replacements > 0) {
+      const free = await this.db.transaction().execute(async (trx) => {
+        const claimed = await trx
+          .updateTable('users')
+          .set({ free_replacements: sql`free_replacements - 1` })
+          .where('id', '=', userId)
+          .where('free_replacements', '>', 0)
+          .executeTakeFirst();
+        if (!Number(claimed.numUpdatedRows)) return null;
+        const o = await trx
+          .insertInto('decal_orders')
+          .values({
+            user_id: userId,
+            status: 'paid',
+            shipping_address_enc: this.crypto.encrypt(JSON.stringify(address)),
+            key_version: this.crypto.keyVersion,
+            total_gross_cents: 0,
+            is_replacement: true,
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await trx
+          .insertInto('decal_order_items')
+          .values({
+            order_id: o.id,
+            qr_token_id: token.id,
+            product: 'uv_vinyl_sticker',
+            unit_gross_cents: 0,
+          })
+          .execute();
+        await trx
+          .insertInto('outbox_events')
+          .values({ topic: PRINT_TOPIC, payload: JSON.stringify({ orderId: o.id }) })
+          .execute();
+        return o;
+      });
+      if (free) return { id: free.id, url: `${back}?order=paid` };
+    }
+
     if (!user.stripe_customer_id) throw new ConflictException({ error: 'no_customer' });
     const amount = ADDON_PRICES_CENTS.replacementDecal;
     const order = await this.db.transaction().execute(async (trx) => {
@@ -143,7 +195,6 @@ export class OrdersService {
         .execute();
       return o;
     });
-    const back = `${this.env.WEB_BASE_URL}/konto/fahrzeuge/${vehicleId}`;
     return this.payments.createPaymentCheckout({
       customerId: user.stripe_customer_id,
       amountCents: amount,

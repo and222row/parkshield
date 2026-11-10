@@ -126,8 +126,8 @@ export async function createHarness(): Promise<Harness> {
 let settingsSeed: { key: string; value: unknown }[] | null = null;
 
 /**
- * Removes everything tests create. TRUNCATE … CASCADE also reaches app_settings (updated_by → users),
- * so the seeded runtime settings are snapshotted once and put back after every reset.
+ * Removes everything tests create. TRUNCATE … CASCADE also reaches app_settings (updated_by → users)
+ * and filter_word_lists (created_by → users), so their seeds are put back after every reset.
  */
 export async function resetState(h: Harness): Promise<void> {
   await restoreTouched(h);
@@ -144,9 +144,39 @@ export async function resetState(h: Harness): Promise<void> {
       )
       .execute();
   }
+  // filter_word_lists.created_by → users, so the cascade empties it too: put the seed version back.
+  await h.db
+    .insertInto('filter_word_lists')
+    .values({ words: JSON.stringify(SEED_WORDS), note: 'Initial lists' })
+    .execute();
   await h.valkey.flushdb();
   h.app.get(SettingsService).invalidate();
 }
+
+/** Same as the seed in 20261115000000_sprint9_ops_tools.sql. */
+const SEED_WORDS = {
+  insults: {
+    de: [
+      'arsch',
+      'arschloch',
+      'idiot',
+      'wichser',
+      'fotze',
+      'hurensohn',
+      'spast',
+      'missgeburt',
+      'penner',
+      'schlampe',
+      'vollidiot',
+      'depp',
+    ],
+    en: ['asshole', 'fuck', 'bitch', 'cunt', 'moron', 'retard'],
+  },
+  threats: {
+    de: ['umbringen', 'abstechen', 'kaputtmachen', 'zerkratzen', 'abfackeln'],
+    en: ['kill you'],
+  },
+};
 
 export interface DevMail {
   to: string;

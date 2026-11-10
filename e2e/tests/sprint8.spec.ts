@@ -1,31 +1,18 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { config } from 'dotenv';
-import pg from 'pg';
 import {
   expectAccessible,
   ownerWithActiveDecal,
   scannerPage,
+  sql,
   uniqueEmail,
   waitForMail,
 } from './helpers';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const envFile = join(ROOT, '.env');
-if (existsSync(envFile)) config({ path: envFile, quiet: true });
 const OPS_URL = process.env.OPS_BASE_URL ?? 'http://localhost:3001';
-
-async function sql(text: string, params: unknown[] = []) {
-  const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-  await db.connect();
-  try {
-    return (await db.query(text, params)).rows;
-  } finally {
-    await db.end();
-  }
-}
 
 test('history shows the alert with its text; reporting blocks that scanner (US-31)', async ({
   page,

@@ -36,7 +36,14 @@ export class CoreModule implements OnApplicationShutdown {
           useFactory: () =>
             new Kysely<Database>({
               dialect: new PostgresDialect({
-                pool: new pg.Pool({ connectionString: env.DATABASE_URL, max: 10 }),
+                pool: new pg.Pool({
+                  connectionString: env.DATABASE_URL,
+                  max: 10,
+                  // Keep connections warm: a new PostgreSQL backend costs ~400 ms on Windows (and a
+                  // few ms on Linux). The default 10 s idle timeout made every burst reconnect.
+                  idleTimeoutMillis: 5 * 60_000,
+                  keepAlive: true,
+                }),
               }),
             }),
         },

@@ -19,7 +19,7 @@ import { PAYMENTS, type Payments } from '../providers/ports';
 
 export const DELETION_GRACE_HOURS = 24;
 
-type Step = {
+export type Step = {
   processor: string;
   automated: boolean;
   status: 'pending' | 'done' | 'not_applicable';
@@ -352,49 +352,107 @@ export class PrivacyService {
 
   // --- deletion -------------------------------------------------------------------------------
 
-  private cancelToken(dsrId: string) {
-    const mac = createHmac('sha256', this.cancelKey).update(dsrId).digest('base64url');
+  /** Links bound to one request: "cancel deletion" and "confirm it is me" (AD-11 identity check). */
+  private dsrToken(dsrId: string, purpose: 'cancel' | 'verify') {
+    const mac = createHmac('sha256', this.cancelKey)
+      .update(`${purpose}:${dsrId}`)
+      .digest('base64url');
     return `${uuidToB64(dsrId)}${mac}`;
   }
 
-  private parseCancelToken(token: string): string | null {
+  private parseDsrToken(token: string, purpose: 'cancel' | 'verify'): string | null {
     if (token.length !== 22 + 43) return null;
     const id = b64ToUuid(token.slice(0, 22));
     if (!id) return null;
-    const a = Buffer.from(this.cancelToken(id));
+    const a = Buffer.from(this.dsrToken(id, purpose));
     const b = Buffer.from(token);
     return a.length === b.length && timingSafeEqual(a, b) ? id : null;
   }
 
-  async requestDeletion(user: AuthContext): Promise<{ deletionDueAt: Date }> {
-    this.requireRecentSignIn(user);
+  /** One step per processor (AD-11); what does not apply to this person is marked as such. */
+  async stepsFor(
+    db: Db,
+    userId: string | null,
+    type: 'erasure' | 'access_export' | string,
+  ): Promise<Step[]> {
+    const [u, hasWhatsApp, hasOrders] = userId
+      ? await Promise.all([
+          db
+            .selectFrom('users')
+            .select('stripe_customer_id')
+            .where('id', '=', userId)
+            .executeTakeFirst(),
+          db
+            .selectFrom('contact_channels')
+            .select('id')
+            .where('user_id', '=', userId)
+            .where('type', '=', 'whatsapp')
+            .executeTakeFirst(),
+          db
+            .selectFrom('decal_orders')
+            .select('id')
+            .where('user_id', '=', userId)
+            .executeTakeFirst(),
+        ])
+      : [undefined, undefined, undefined];
+    const na = (applies: unknown): 'pending' | 'not_applicable' =>
+      applies ? 'pending' : 'not_applicable';
+    return [
+      {
+        processor: 'parkshield_db',
+        automated: type === 'erasure',
+        status: userId ? 'pending' : 'not_applicable',
+      },
+      { processor: 'stripe', automated: type === 'erasure', status: na(u?.stripe_customer_id) },
+      // Transactional mail only: Brevo keeps no contact list for us, only 30-day logs.
+      { processor: 'brevo', automated: type === 'erasure', status: 'pending' },
+      {
+        processor: 'sentry',
+        automated: true,
+        status: 'done',
+        evidence: 'no personal data sent (scrubbed at source)',
+      },
+      { processor: '360dialog', automated: false, status: na(hasWhatsApp) },
+      { processor: 'print_partner', automated: false, status: na(hasOrders) },
+      { processor: 'zammad', automated: false, status: 'pending' },
+    ];
+  }
+
+  async insertSteps(db: Db, dsrId: string, steps: Step[]) {
+    await db
+      .insertInto('dsr_processor_steps')
+      .values(
+        steps.map((s) => ({
+          dsr_id: dsrId,
+          processor: s.processor,
+          automated: s.automated,
+          status: s.status,
+          evidence_ref: s.evidence ?? null,
+          completed_at: s.status === 'done' ? sql<Date>`now()` : null,
+        })),
+      )
+      .execute();
+  }
+
+  /**
+   * Starts the erasure for a verified request: codes off at once, signed out everywhere, 24 h grace
+   * period with a cancel link, then the worker's processor steps (processDue).
+   */
+  private async beginErasure(userId: string, dsrId: string): Promise<Date> {
     const due = new Date(Date.now() + DELETION_GRACE_HOURS * 3600_000);
-    const dsrId = await this.db.transaction().execute(async (trx) => {
-      const u = await trx
+    const u = await this.db.transaction().execute(async (trx) => {
+      const row = await trx
         .selectFrom('users')
-        .select(['status', 'stripe_customer_id'])
-        .where('id', '=', user.userId)
+        .select(['status', 'email', 'preferred_lang'])
+        .where('id', '=', userId)
         .forUpdate()
         .executeTakeFirstOrThrow();
-      if (u.status === 'pending_deletion')
+      if (row.status === 'pending_deletion')
         throw new ConflictException({ error: 'already_requested' });
-      const [hasWhatsApp, hasOrders] = await Promise.all([
-        trx
-          .selectFrom('contact_channels')
-          .select('id')
-          .where('user_id', '=', user.userId)
-          .where('type', '=', 'whatsapp')
-          .executeTakeFirst(),
-        trx
-          .selectFrom('decal_orders')
-          .select('id')
-          .where('user_id', '=', user.userId)
-          .executeTakeFirst(),
-      ]);
       await trx
         .updateTable('users')
         .set({ status: 'pending_deletion', deletion_due_at: due })
-        .where('id', '=', user.userId)
+        .where('id', '=', userId)
         .execute();
       // Codes stop working at once (US-32): nobody can reach this person through a decal any more.
       await trx
@@ -404,9 +462,33 @@ export class PrivacyService {
         .where(
           'vehicle_id',
           'in',
-          trx.selectFrom('vehicles').select('id').where('owner_user_id', '=', user.userId),
+          trx.selectFrom('vehicles').select('id').where('owner_user_id', '=', userId),
         )
         .execute();
+      return row;
+    });
+    await this.sessions.revokeAll(userId);
+    await this.mail.send({
+      to: u.email,
+      template: 'deletion_requested',
+      locale: u.preferred_lang,
+      values: { due },
+      actionUrl: `${this.env.WEB_BASE_URL}/konto-loeschen-abbrechen#t=${this.dsrToken(dsrId, 'cancel')}`,
+    });
+    return due;
+  }
+
+  async requestDeletion(user: AuthContext): Promise<{ deletionDueAt: Date }> {
+    this.requireRecentSignIn(user);
+    const current = await this.db
+      .selectFrom('users')
+      .select('status')
+      .where('id', '=', user.userId)
+      .executeTakeFirstOrThrow();
+    if (current.status === 'pending_deletion')
+      throw new ConflictException({ error: 'already_requested' });
+    const steps = await this.stepsFor(this.db, user.userId, 'erasure');
+    const dsrId = await this.db.transaction().execute(async (trx) => {
       const dsr = await trx
         .insertInto('data_subject_requests')
         .values({
@@ -419,62 +501,73 @@ export class PrivacyService {
         })
         .returning('id')
         .executeTakeFirstOrThrow();
-      const steps: Step[] = [
-        { processor: 'parkshield_db', automated: true, status: 'pending' },
-        {
-          processor: 'stripe',
-          automated: true,
-          status: u.stripe_customer_id ? 'pending' : 'not_applicable',
-        },
-        // Transactional mail only: Brevo keeps no contact list for us, only 30-day logs.
-        { processor: 'brevo', automated: true, status: 'pending' },
-        {
-          processor: 'sentry',
-          automated: true,
-          status: 'done',
-          evidence: 'no personal data sent (scrubbed at source)',
-        },
-        {
-          processor: '360dialog',
-          automated: false,
-          status: hasWhatsApp ? 'pending' : 'not_applicable',
-        },
-        {
-          processor: 'print_partner',
-          automated: false,
-          status: hasOrders ? 'pending' : 'not_applicable',
-        },
-        { processor: 'zammad', automated: false, status: 'pending' },
-      ];
-      await trx
-        .insertInto('dsr_processor_steps')
-        .values(
-          steps.map((s) => ({
-            dsr_id: dsr.id,
-            processor: s.processor,
-            automated: s.automated,
-            status: s.status,
-            evidence_ref: s.evidence ?? null,
-            completed_at: s.status === 'done' ? sql<Date>`now()` : null,
-          })),
-        )
-        .execute();
+      await this.insertSteps(trx, dsr.id, steps);
       return dsr.id;
     });
-    await this.sessions.revokeAll(user.userId);
+    return { deletionDueAt: await this.beginErasure(user.userId, dsrId) };
+  }
+
+  // --- requests received by support (ops GDPR queue, US-37) -------------------------------------
+
+  /** Sends the "confirm it is you" link for a request created by support. */
+  async sendVerification(dsrId: string, email: string, lang: 'de' | 'en'): Promise<void> {
     await this.mail.send({
-      to: user.email,
-      template: 'deletion_requested',
-      locale: user.preferredLang,
-      values: { due },
-      actionUrl: `${this.env.WEB_BASE_URL}/konto-loeschen-abbrechen#t=${this.cancelToken(dsrId)}`,
+      to: email,
+      template: 'dsr_verify',
+      locale: lang,
+      values: {},
+      actionUrl: `${this.env.WEB_BASE_URL}/datenschutz-anfrage#t=${this.dsrToken(dsrId, 'verify')}`,
     });
-    return { deletionDueAt: due };
+  }
+
+  /** Public: the person confirms the request from their own mailbox (verification method email_link). */
+  async confirmIdentity(token: string): Promise<{ type: string }> {
+    const dsrId = this.parseDsrToken(token, 'verify');
+    if (!dsrId) throw new NotFoundException({ error: 'link_invalid' });
+    return this.identityVerified(dsrId, 'email_link');
+  }
+
+  /** After identity is verified (link or manual check by ops): start what the request asks for. */
+  async identityVerified(
+    dsrId: string,
+    method: 'email_link' | 'manual',
+    note?: string,
+  ): Promise<{ type: string }> {
+    const r = await this.db
+      .updateTable('data_subject_requests')
+      .set({
+        identity_verified_at: sql`now()`,
+        verification_method: method,
+        status: 'in_progress',
+        ...(note ? { note: note.slice(0, 500) } : {}),
+      })
+      .where('id', '=', dsrId)
+      .where('status', 'in', ['received', 'awaiting_identity'])
+      .returning(['id', 'type', 'user_id'])
+      .executeTakeFirst();
+    if (!r) throw new NotFoundException({ error: 'link_invalid' });
+    if (r.user_id && r.type === 'erasure') await this.beginErasure(r.user_id, r.id);
+    if (r.user_id && r.type === 'access_export') {
+      // The copy is provided through the self-service export (JSON + PDF) after signing in.
+      const u = await this.db
+        .selectFrom('users')
+        .select(['email', 'preferred_lang'])
+        .where('id', '=', r.user_id)
+        .executeTakeFirstOrThrow();
+      await this.mail.send({
+        to: u.email,
+        template: 'dsr_export_ready',
+        locale: u.preferred_lang,
+        actionUrl: `${this.env.WEB_BASE_URL}/konto/daten`,
+      });
+      await this.setStep(r.id, 'parkshield_db', 'done', 'self-service export offered by e-mail');
+    }
+    return { type: r.type };
   }
 
   /** Within the 24 h grace period, the link in the confirmation e-mail keeps the account. */
   async cancelDeletion(token: string): Promise<void> {
-    const dsrId = this.parseCancelToken(token);
+    const dsrId = this.parseDsrToken(token, 'cancel');
     if (!dsrId) throw new NotFoundException({ error: 'link_invalid' });
     const ok = await this.db.transaction().execute(async (trx) => {
       const r = await trx

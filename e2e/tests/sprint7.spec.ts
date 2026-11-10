@@ -1,29 +1,14 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { expect, test, type Browser } from '@playwright/test';
-import { config } from 'dotenv';
-import pg from 'pg';
-import { expectAccessible, ownerWithActiveDecal, uniqueEmail } from './helpers';
+import { expectAccessible, ownerWithActiveDecal, sql, uniqueEmail } from './helpers';
 
-const envFile = join(import.meta.dirname, '..', '..', '.env');
-if (existsSync(envFile)) config({ path: envFile, quiet: true });
-
-async function deliveries(email: string) {
-  const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-  await db.connect();
-  try {
-    const { rows } = await db.query(
-      `SELECT a.alert_type, d.status, d.suppressed_reason
-         FROM alert_deliveries d JOIN alerts a ON a.id = d.alert_id
-         JOIN vehicles v ON v.id = a.vehicle_id JOIN users u ON u.id = v.owner_user_id
-        WHERE u.email = $1 AND NOT a.is_test AND d.recipient = 'owner' ORDER BY d.queued_at`,
-      [email],
-    );
-    return rows as { alert_type: string; status: string; suppressed_reason: string | null }[];
-  } finally {
-    await db.end();
-  }
-}
+const deliveries = (email: string) =>
+  sql<{ alert_type: string; status: string; suppressed_reason: string | null }>(
+    `SELECT a.alert_type, d.status, d.suppressed_reason
+       FROM alert_deliveries d JOIN alerts a ON a.id = d.alert_id
+       JOIN vehicles v ON v.id = a.vehicle_id JOIN users u ON u.id = v.owner_user_id
+      WHERE u.email = $1 AND NOT a.is_test AND d.recipient = 'owner' ORDER BY d.queued_at`,
+    [email],
+  );
 
 /** Each "scanner" gets its own browser identity, so the per-scanner limit does not interfere. */
 async function scanAs(browser: Browser, url: string, n: number) {

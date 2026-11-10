@@ -206,6 +206,7 @@ export interface BreakGlassRequests {
   approved_at: Timestamp | null;
   approver_id: string | null;
   created_at: Generated<Timestamp>;
+  first_revealed_at: Timestamp | null;
   id: Generated<string>;
   notify_customer: Generated<boolean>;
   reason: string;
@@ -260,6 +261,8 @@ export interface DataSubjectRequests {
   handled_by: string | null;
   id: Generated<string>;
   identity_verified_at: Timestamp | null;
+  note: string | null;
+  reminded_at: Timestamp | null;
   status: Generated<DsrStatus>;
   type: DsrType;
   user_id: string | null;
@@ -317,6 +320,14 @@ export interface EmergencyContacts {
   key_version: Generated<number>;
   user_id: string;
   vehicle_id: string | null;
+}
+
+export interface FilterWordLists {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  note: string | null;
+  version: Generated<number>;
+  words: Json;
 }
 
 export interface MagicLinkTokens {
@@ -580,6 +591,7 @@ export interface Users {
   email: string;
   email_verified_at: Timestamp | null;
   escalation_minutes: number | null;
+  free_replacements: Generated<number>;
   id: Generated<string>;
   kind: Generated<UserKind>;
   last_login_at: Timestamp | null;
@@ -666,6 +678,7 @@ export interface DB {
   decal_orders: DecalOrders;
   dsr_processor_steps: DsrProcessorSteps;
   emergency_contacts: EmergencyContacts;
+  filter_word_lists: FilterWordLists;
   magic_link_tokens: MagicLinkTokens;
   moderation_reviews: ModerationReviews;
   notification_rules: NotificationRules;

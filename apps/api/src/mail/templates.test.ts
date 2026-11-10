@@ -34,6 +34,10 @@ const values = {
   channel: 'WhatsApp',
   due: new Date('2027-08-04T09:15:00Z'),
   name: 'Anna',
+  field: 'Kennzeichen',
+  ticket: 'ZM-1234',
+  count: 2,
+  first: new Date('2027-08-10T09:15:00Z'),
 };
 
 describe('mail templates', () => {

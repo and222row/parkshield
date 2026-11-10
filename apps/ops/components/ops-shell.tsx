@@ -37,25 +37,40 @@ export function OpsShell({ me, children }: { me: StaffMe; children: ReactNode })
     window.location.assign('/anmelden');
   }
 
-  const canManageStaff = me.permissions.includes('staff.manage');
+  const can = (p: string) => me.permissions.includes(p);
+  // The menu mirrors permissions; the API checks them again on every call.
+  const items: { href: string; label: string; show: boolean }[] = [
+    { href: '/', label: t('ops.navHome'), show: true },
+    { href: '/kunden', label: t('ops.navCustomers'), show: can('customer.read_masked') },
+    {
+      href: '/break-glass',
+      label: t('ops.navBreakGlass'),
+      show: can('pii.decrypt_request') || can('pii.decrypt_approve'),
+    },
+    { href: '/datenschutz', label: t('ops.navDsr'), show: can('dsr.process') },
+    { href: '/missbrauch', label: t('ops.navAbuse'), show: can('abuse.moderate') },
+    { href: '/missbrauch/pruefung', label: t('ops.navReview'), show: can('moderation.review') },
+    { href: '/missbrauch/woerter', label: t('ops.navWords'), show: can('abuse.moderate') },
+    { href: '/mitarbeitende', label: t('ops.navStaff'), show: can('staff.manage') },
+  ];
   return (
     <>
       <header className="border-b border-border">
         <Container className="flex flex-wrap items-center justify-between gap-3 py-3">
-          <nav aria-label="Ops" className="flex items-center gap-4">
+          <nav aria-label="Ops" className="flex flex-wrap items-center gap-4">
             <Link href="/" className="font-bold">
               {t('ops.title')}
             </Link>
-            <Link href="/" className="text-primary underline">
-              {t('ops.navHome')}
-            </Link>
-            {canManageStaff && (
-              <Link href="/mitarbeitende" className="text-primary underline">
-                {t('ops.navStaff')}
-              </Link>
-            )}
+            {items
+              .filter((i) => i.show)
+              .map((i) => (
+                <Link key={i.href} href={i.href} className="text-primary underline">
+                  {i.label}
+                </Link>
+              ))}
           </nav>
-          <div className="flex items-center gap-3">
+          {/* Wraps on phones: a long staff address must not push the page wider than the screen. */}
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <Text muted className="text-sm">
               {t('ops.welcome', { email: me.email })}
             </Text>

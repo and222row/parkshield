@@ -57,6 +57,14 @@ export class PrivacyController {
     return r;
   }
 
+  /** Link from the "confirm your request" e-mail sent by support (AD-11 identity verification). */
+  @Post('dsr/confirm')
+  @HttpCode(200)
+  @SkipCsrf()
+  confirm(@Body(new ZodPipe(Cancel)) body: z.infer<typeof Cancel>) {
+    return this.privacy.confirmIdentity(body.token);
+  }
+
   /** Link from the confirmation e-mail; the person is signed out, so the token authenticates. */
   @Post('deletion/cancel')
   @HttpCode(200)

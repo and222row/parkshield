@@ -215,6 +215,45 @@ const templates = {
       ],
       action: 'Passkey einrichten',
     },
+    break_glass_notice: {
+      subject: 'Unser Support hat Ihre Daten eingesehen',
+      lines: [
+        'Am {when, date, long} um {when, time, short} Uhr hat eine Mitarbeiterin oder ein Mitarbeiter unseres Supports folgendes Feld eingesehen: {field}.',
+        'Das geht bei uns nur mit Begründung, nach Freigabe durch eine zweite Person und für 15 Minuten. Vorgang: {ticket}.',
+        'Wenn Sie dazu Fragen haben, antworten Sie einfach auf diese E-Mail.',
+      ],
+    },
+    dsr_verify: {
+      subject: 'Bitte bestätigen Sie Ihre Datenschutz-Anfrage',
+      lines: [
+        'Wir haben eine Datenschutz-Anfrage für diese E-Mail-Adresse erhalten (z. B. Auskunft oder Löschung).',
+        'Damit niemand anderes in Ihrem Namen handelt, bestätigen Sie bitte, dass die Anfrage von Ihnen kommt. Ohne Bestätigung tun wir nichts.',
+      ],
+      action: 'Anfrage bestätigen',
+    },
+    dsr_export_ready: {
+      subject: 'Ihre Daten stehen bereit',
+      lines: [
+        'Danke für die Bestätigung. Melden Sie sich an und laden Sie Ihre Daten als JSON und PDF herunter.',
+      ],
+      action: 'Daten herunterladen',
+    },
+    dsr_due_soon: {
+      subject:
+        '{count, plural, one {Eine Datenschutz-Anfrage} other {# Datenschutz-Anfragen}}: Frist in 7 Tagen',
+      lines: [
+        '{count, plural, one {Eine Anfrage muss} other {# Anfragen müssen}} bis spätestens {first, date, long} erledigt sein.',
+      ],
+      action: 'Warteschlange öffnen',
+    },
+    code_revoked_by_us: {
+      subject: 'Wir haben den Code an „{nickname}“ gesperrt',
+      lines: [
+        'Wir haben an Ihrem Aufkleber für „{nickname}“ auffällig viele Warnungen oder Meldungen gesehen und den Code zu Ihrem Schutz gesperrt. Er hat jetzt einen neuen Code.',
+        'Der Ersatzaufkleber ist für Sie kostenlos. Bestellen Sie ihn im Konto; bis er da ist, können Sie ihn als PDF ausdrucken.',
+      ],
+      action: 'Ersatzaufkleber bestellen',
+    },
   },
   en: {
     magic_link: {
@@ -421,6 +460,43 @@ const templates = {
         'There are no passwords. If you did not expect this access, please tell the security team at once.',
       ],
       action: 'Set up passkey',
+    },
+    break_glass_notice: {
+      subject: 'Our support team viewed your data',
+      lines: [
+        'On {when, date, long} at {when, time, short}, a member of our support team viewed this field: {field}.',
+        'This is only possible with a stated reason, after approval by a second person, and for 15 minutes. Case: {ticket}.',
+        'If you have questions about it, simply reply to this e-mail.',
+      ],
+    },
+    dsr_verify: {
+      subject: 'Please confirm your privacy request',
+      lines: [
+        'We received a privacy request for this e-mail address (for example access or erasure).',
+        'So that nobody else can act in your name, please confirm that the request comes from you. Without confirmation we do nothing.',
+      ],
+      action: 'Confirm request',
+    },
+    dsr_export_ready: {
+      subject: 'Your data is ready',
+      lines: ['Thank you for confirming. Sign in and download your data as JSON and PDF.'],
+      action: 'Download data',
+    },
+    dsr_due_soon: {
+      subject:
+        '{count, plural, one {One privacy request} other {# privacy requests}}: deadline in 7 days',
+      lines: [
+        '{count, plural, one {One request has} other {# requests have}} to be completed by {first, date, long} at the latest.',
+      ],
+      action: 'Open the queue',
+    },
+    code_revoked_by_us: {
+      subject: 'We revoked the code on “{nickname}”',
+      lines: [
+        'We saw unusually many alerts or reports on your decal for “{nickname}” and revoked the code to protect you. It now has a new code.',
+        'The replacement decal is free for you. Order it in your account; until it arrives you can print it as a PDF.',
+      ],
+      action: 'Order replacement decal',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

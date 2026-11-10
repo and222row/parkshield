@@ -7,7 +7,18 @@ import { CsrfGuard, SessionGuard } from './auth/guards';
 import { PasskeyService, StaffPasskeyService } from './auth/passkey.service';
 import { HistoryController } from './history/history.controller';
 import { HistoryService } from './history/history.service';
+import { WordListsService } from './moderation/word-lists.service';
+import { AbuseService } from './ops/abuse.service';
+import { BreakGlassService } from './ops/break-glass.service';
+import { CustomersService } from './ops/customers.service';
+import { DsrService } from './ops/dsr.service';
 import { OpsAuthController } from './ops/ops-auth.controller';
+import {
+  OpsAbuseController,
+  OpsBreakGlassController,
+  OpsCustomersController,
+  OpsDsrController,
+} from './ops/ops-tools.controller';
 import { OpsStaffController } from './ops/ops-staff.controller';
 import { StaffGuard } from './ops/staff.guard';
 import { StaffService } from './ops/staff.service';
@@ -79,7 +90,11 @@ const domainProviders = [
   SessionService,
   HistoryService,
   PrivacyService,
+  WordListsService,
 ];
+
+/** Ops back-office services (api-ops; the worker uses the GDPR deadline reminder). */
+const opsProviders = [StaffService, CustomersService, BreakGlassService, DsrService, AbuseService];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
 @Module({})
@@ -128,10 +143,19 @@ export class OpsAppModule {
     return {
       module: OpsAppModule,
       imports: [CoreModule.forRoot(env, logger), ProvidersModule.forRoot(env)],
-      controllers: [OpsHealthController, OpsAuthController, OpsStaffController],
+      controllers: [
+        OpsHealthController,
+        OpsAuthController,
+        OpsStaffController,
+        OpsCustomersController,
+        OpsBreakGlassController,
+        OpsDsrController,
+        OpsAbuseController,
+      ],
       providers: [
         ...sharedProviders,
-        StaffService,
+        ...domainProviders,
+        ...opsProviders,
         StaffPasskeyService,
         // Fails closed: every ops route must declare its access policy (US-34).
         { provide: APP_GUARD, useClass: StaffGuard },
@@ -149,6 +173,8 @@ export class WorkerModule {
       providers: [
         ...sharedProviders,
         ...domainProviders,
+        StaffService,
+        DsrService,
         OutboxService,
         SchedulerService,
         WorkerBootstrap,

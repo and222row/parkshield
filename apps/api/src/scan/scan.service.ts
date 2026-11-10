@@ -9,6 +9,7 @@ import { RateLimitService } from '../core/rate-limit.service';
 import { SettingsService } from '../core/settings.service';
 import { CRYPTO, DB } from '../core/tokens';
 import { filterText } from '../moderation/text-filter';
+import { WordListsService } from '../moderation/word-lists.service';
 import { EscalationService } from '../notifications/escalation.service';
 import { ScannerRefService } from './scanner-ref.service';
 
@@ -40,6 +41,7 @@ export class ScanService {
     @Inject(RateLimitService) private readonly limits: RateLimitService,
     @Inject(GeoService) private readonly geo: GeoService,
     @Inject(EscalationService) private readonly escalation: EscalationService,
+    @Inject(WordListsService) private readonly wordLists: WordListsService,
   ) {}
 
   /**
@@ -151,7 +153,8 @@ export class ScanService {
 
     // Filtered text never reaches the owner (SC-04). It is kept encrypted for 7 days for the review sample.
     if (message) {
-      const verdict = filterText(message);
+      // AD-10: the live word lists from ops (versioned), not the built-in defaults.
+      const verdict = filterText(message, await this.wordLists.forFilter());
       if (!verdict.ok) {
         const blocked = await this.db
           .insertInto('alerts')
