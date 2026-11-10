@@ -7,6 +7,9 @@ export const sha256 = (value: string | Buffer): Buffer =>
 export const randomToken = (bytes = 32): string => randomBytes(bytes).toString('base64url');
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+/** Field ciphertext layout: [key version (1)] [IV (12)] [GCM tag (16)] [ciphertext]. */
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
 
 /** Crockford Base32 string with 5 random bits per character (decal codes, contract numbers). */
 export function randomCrockford(length: number): string {
@@ -53,7 +56,9 @@ export class FieldCrypto {
 
   encrypt(plaintext: string): Buffer {
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.keys.get(this.current)!, iv);
+    const cipher = createCipheriv('aes-256-gcm', this.keys.get(this.current)!, iv, {
+      authTagLength: TAG_BYTES,
+    });
     const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     return Buffer.concat([Buffer.from([this.current]), iv, cipher.getAuthTag(), ct]);
   }
@@ -62,7 +67,11 @@ export class FieldCrypto {
     const version = blob[0]!;
     const key = this.keys.get(version);
     if (!key) throw new Error(`unknown data key version ${version}`);
-    const decipher = createDecipheriv('aes-256-gcm', key, blob.subarray(1, 13));
+    // Fixed 16-byte tag: a truncated blob must fail, never verify against a shorter (forgeable) tag.
+    if (blob.length < 1 + IV_BYTES + TAG_BYTES) throw new Error('ciphertext too short');
+    const decipher = createDecipheriv('aes-256-gcm', key, blob.subarray(1, 13), {
+      authTagLength: TAG_BYTES,
+    });
     decipher.setAuthTag(blob.subarray(13, 29));
     return Buffer.concat([decipher.update(blob.subarray(29)), decipher.final()]).toString('utf8');
   }

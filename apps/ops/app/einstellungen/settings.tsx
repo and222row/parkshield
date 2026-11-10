@@ -305,7 +305,7 @@ function SettingRow({
         </Button>
       </form>
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-        <span className="font-mono">{s.key}</span>
+        <span className="min-w-0 font-mono wrap-anywhere">{s.key}</span>
         <span>{t('opsSettings.version', { version: s.version })}</span>
         {s.updatedAt && (
           <span>

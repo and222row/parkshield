@@ -65,6 +65,7 @@ export class FakePayments implements Payments {
     const now = new Date();
     const invoice: Invoice = {
       id: `in_fake_${randomToken(9)}`,
+      // nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_insecure_random_generator -- display number of a local fake invoice
       number: `DEV-${now.getFullYear()}-${Math.floor(Math.random() * 90000 + 10000)}`,
       createdAt: now,
       totalCents: amountCents,

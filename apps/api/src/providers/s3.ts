@@ -58,7 +58,9 @@ export function signV4(input: SigV4Input): Record<string, string> {
   ].join('\n');
   const scope = `${day}/${input.region}/s3/aws4_request`;
   const toSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonical)].join('\n');
+  // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret -- SigV4 key derivation; the secret is passed in from env
   const key = hmac(
+    // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret -- SigV4 key derivation; the secret is passed in from env
     hmac(hmac(hmac(`AWS4${input.secretKey}`, day), input.region), 's3'),
     'aws4_request',
   );

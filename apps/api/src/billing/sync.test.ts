@@ -61,6 +61,7 @@ describe('subscription sync and dunning (US-08)', () => {
 });
 
 describe('Stripe webhook mapping', () => {
+  // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret -- test fixture, not a real key
   const secret = 'whsec_test_secret';
   const retrieved: Record<string, unknown> = {
     id: 'sub_123',

@@ -54,6 +54,7 @@ export class PrivacyService {
     @Inject(PAYMENTS) private readonly payments: Payments,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {
+    // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret -- key comes from env.SESSION_SECRET
     this.cancelKey = createHmac('sha256', Buffer.from(env.SESSION_SECRET, 'base64'))
       .update('parkshield/dsr-cancel/v1')
       .digest();

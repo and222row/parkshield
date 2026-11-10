@@ -17,6 +17,7 @@ export class S3AuditBucket implements AuditBucket {
 
   async put(key: string, body: Buffer, retainUntil: Date): Promise<'created' | 'exists'> {
     const url = this.s3.url(key);
+    // nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_md5 -- Content-MD5 header that S3 requires for Object Lock uploads; not a security hash
     const md5 = createHash('md5').update(body);
     const head = await this.s3.request('HEAD', url);
     if (head.ok) {

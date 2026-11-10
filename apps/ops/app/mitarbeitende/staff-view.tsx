@@ -44,7 +44,7 @@ function RolePicker({
 }) {
   return (
     <fieldset>
-      <legend className="mb-1 font-semibold">{legend}</legend>
+      <legend className="mb-1 font-semibold wrap-anywhere">{legend}</legend>
       <div className="flex flex-wrap gap-x-4">
         {roles.map((r) => (
           <Checkbox
@@ -133,7 +133,9 @@ function StaffRow({
           <Heading level={2} className="text-lg">
             {person.name ?? person.email}
           </Heading>
-          <Text muted>{person.email}</Text>
+          <Text muted className="min-w-0 wrap-anywhere">
+            {person.email}
+          </Text>
           <Badge tone={person.hasPasskey ? 'success' : 'warning'}>
             {person.hasPasskey ? t('ops.staffPasskey') : t('ops.staffNoPasskey')}
           </Badge>

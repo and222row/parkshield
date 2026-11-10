@@ -55,6 +55,7 @@ export class AckService {
     @Inject(ENV) env: Env,
     @Inject(EscalationService) private readonly escalation: EscalationService,
   ) {
+    // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_secret -- key comes from env.SESSION_SECRET
     this.key = createHmac('sha256', Buffer.from(env.SESSION_SECRET, 'base64'))
       .update('parkshield/ack/v1')
       .digest();

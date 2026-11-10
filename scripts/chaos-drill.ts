@@ -40,6 +40,7 @@ const accepted: string[] = [];
 const statuses = new Map<string, number>();
 let n = 0;
 const fire = async () => {
+  // nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_insecure_random_generator -- chaos drill picks a random decal
   const code = codes[Math.floor(Math.random() * codes.length)];
   try {
     const res = await fetch(`${values.api}/v1/scan/${code}/alerts`, {

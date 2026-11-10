@@ -178,6 +178,7 @@ export class ScanService {
           .returning('id')
           .executeTakeFirstOrThrow();
         const rate = Number(await this.settings.get('moderation.sample_rate', 0.1));
+        // nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_insecure_random_generator -- sampling blocked alerts for human review, not a secret
         if (Math.random() < rate) {
           await this.db
             .insertInto('moderation_reviews')

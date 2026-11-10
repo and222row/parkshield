@@ -14,6 +14,7 @@ interface Mail {
 
 const linkify = (text: string) =>
   text.split(/(https?:\/\/\S+)/g).map((part, i) =>
+    // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- anchored literal prefix, no backtracking; dev-only page
     /^https?:\/\//.test(part) ? (
       <a key={i} href={part} className="break-all text-primary underline">
         {part}

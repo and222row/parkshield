@@ -18,6 +18,7 @@ const DURATION = __ENV.DURATION || '60s';
 const CAPTCHA = __ENV.CAPTCHA || 'dev-captcha-ok';
 
 const codes = new SharedArray('codes', () => JSON.parse(open('../../.local/load/codes.json')));
+// nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_insecure_random_generator -- load test picks a random decal
 const pick = () => codes[Math.floor(Math.random() * codes.length)];
 const TYPES = ['lights_on', 'window_open', 'alarm', 'blocking', 'towing_risk'];
 
@@ -63,6 +64,7 @@ export function alert() {
   const res = http.post(
     `${API}/v1/scan/${pick()}/alerts`,
     JSON.stringify({
+      // nosemgrep: ajinabraham.njsscan.crypto.crypto_node.node_insecure_random_generator -- load test picks a random alert type
       type: TYPES[Math.floor(Math.random() * TYPES.length)],
       captcha: CAPTCHA,
       lang: 'de',

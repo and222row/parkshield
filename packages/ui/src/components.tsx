@@ -241,7 +241,8 @@ export function Checkbox({
   return (
     <label className={clsx('flex min-h-12 cursor-pointer items-center gap-3', className)}>
       <input type="checkbox" className="size-6 accent-[var(--ps-primary)]" {...rest} />
-      <span>{label}</span>
+      {/* min-w-0: a flex item never shrinks below its longest word otherwise (reflow at 320 px). */}
+      <span className="min-w-0">{label}</span>
     </label>
   );
 }

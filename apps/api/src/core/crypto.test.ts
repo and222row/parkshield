@@ -41,6 +41,13 @@ describe('FieldCrypto', () => {
     expect(() => c.decrypt(blob)).toThrow();
   });
 
+  it('never accepts a truncated (shorter) authentication tag', () => {
+    const c = new FieldCrypto(new Map([[1, k1]]), bidx);
+    const blob = c.encrypt('');
+    // Empty plaintext: the blob ends with the 16-byte tag; cutting it leaves a 4-byte "tag".
+    expect(() => c.decrypt(blob.subarray(0, 1 + 12 + 4))).toThrow('ciphertext too short');
+  });
+
   it('builds a normalised, keyed blind index', () => {
     const c = new FieldCrypto(new Map([[1, k1]]), bidx);
     expect(c.blindIndex(' Jonas@Example.de ').equals(c.blindIndex('jonas@example.de'))).toBe(true);

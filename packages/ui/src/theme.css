@@ -94,6 +94,11 @@
     /* Long e-mail addresses, plates and links break instead of widening the page on a phone. */
     overflow-wrap: break-word;
   }
+  /* Browsers size a fieldset to its longest word (min-inline-size: min-content); let it shrink so
+     long e-mail addresses wrap instead of widening the page (WCAG 1.4.10). */
+  fieldset {
+    min-inline-size: 0;
+  }
   :focus-visible {
     outline: 3px solid var(--ps-focus);
     outline-offset: 2px;
