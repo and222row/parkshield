@@ -8,7 +8,18 @@ import { DevCaptcha, FriendlyCaptcha } from './captcha';
 import { FakePayments } from './fake-payments';
 import { FakePrintPartner } from './fake-print';
 import { BrevoMailer, DevMailer } from './mailer';
-import { CAPTCHA, MAILER, PAYMENTS, PRINT, PUSH, WHATSAPP } from './ports';
+import { LocalAuditBucket, S3AuditBucket } from './audit-bucket';
+import {
+  AUDIT_BUCKET,
+  CAPTCHA,
+  MAILER,
+  PAYMENTS,
+  PRINT,
+  PUSH,
+  SUPPORT_DESK,
+  WHATSAPP,
+} from './ports';
+import { DevSupportDesk, ZammadDesk } from './support-desk';
 import { VapidPushSender } from './push';
 import { Dialog360Sender, DevWhatsAppSender } from './whatsapp';
 import { StripePayments } from './stripe-payments';
@@ -74,8 +85,31 @@ export class ProvidersModule {
               ? new DevWhatsAppSender(valkey, logger)
               : new Dialog360Sender(env.D360_API_KEY, env.D360_BASE_URL),
         },
+        {
+          provide: AUDIT_BUCKET,
+          useFactory: () =>
+            fakes.auditBucket
+              ? new LocalAuditBucket(
+                  env.AUDIT_BUCKET_DIR || join(repoRoot(), '.local', 'audit-bucket'),
+                )
+              : new S3AuditBucket({
+                  endpoint: env.S3_ENDPOINT,
+                  region: env.S3_REGION,
+                  accessKey: env.S3_ACCESS_KEY,
+                  secretKey: env.S3_SECRET_KEY,
+                  bucket: env.AUDIT_BUCKET,
+                }),
+        },
+        {
+          provide: SUPPORT_DESK,
+          inject: [VALKEY, LOGGER],
+          useFactory: (valkey: Redis, logger: Logger) =>
+            fakes.support
+              ? new DevSupportDesk(valkey, logger)
+              : new ZammadDesk(env.ZAMMAD_URL, env.ZAMMAD_TOKEN, env.ZAMMAD_GROUP),
+        },
       ],
-      exports: [MAILER, CAPTCHA, PAYMENTS, PRINT, PUSH, WHATSAPP],
+      exports: [MAILER, CAPTCHA, PAYMENTS, PRINT, PUSH, WHATSAPP, AUDIT_BUCKET, SUPPORT_DESK],
     };
   }
 }

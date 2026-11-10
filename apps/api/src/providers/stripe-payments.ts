@@ -1,7 +1,9 @@
 import Stripe from 'stripe';
 import type {
   BillingEvent,
+  Charge,
   CheckoutRequest,
+  CouponInput,
   Invoice,
   PaidPlan,
   PaymentCheckoutRequest,
@@ -38,6 +40,86 @@ export class StripePayments implements Payments {
     client?: Stripe,
   ) {
     this.stripe = client ?? new Stripe(secretKey);
+  }
+
+  async findCharge(
+    ref: { subscriptionId: string } | { paymentIntentId: string },
+  ): Promise<Charge | null> {
+    let pi: string | null;
+    if ('paymentIntentId' in ref) pi = ref.paymentIntentId;
+    else {
+      const invoices = await this.stripe.invoices.list({
+        subscription: ref.subscriptionId,
+        status: 'paid',
+        limit: 1,
+      });
+      const invoice = invoices.data[0];
+      if (!invoice?.id) return null;
+      // Since the 2025 API versions an invoice's payments are their own resource.
+      const payments = await this.stripe.invoicePayments.list({ invoice: invoice.id, limit: 1 });
+      const intent = payments.data[0]?.payment.payment_intent;
+      pi = typeof intent === 'string' ? intent : (intent?.id ?? null);
+    }
+    if (!pi) return null;
+    const intent = await this.stripe.paymentIntents.retrieve(pi, { expand: ['latest_charge'] });
+    const charge = intent.latest_charge as Stripe.Charge | string | null;
+    return {
+      paymentIntentId: pi,
+      amountCents: intent.amount_received,
+      refundedCents: typeof charge === 'object' && charge ? charge.amount_refunded : 0,
+    };
+  }
+
+  async refund(input: {
+    paymentIntentId: string;
+    amountCents: number;
+    metadata: Record<string, string>;
+  }): Promise<{ refundId: string }> {
+    const r = await this.stripe.refunds.create({
+      payment_intent: input.paymentIntentId,
+      amount: input.amountCents,
+      reason: 'requested_by_customer',
+      metadata: input.metadata,
+    });
+    return { refundId: r.id };
+  }
+
+  async cancelNow(subscriptionId: string): Promise<void> {
+    try {
+      await this.stripe.subscriptions.cancel(subscriptionId, { prorate: false });
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'resource_missing') throw err;
+    }
+  }
+
+  async extendPeriod(subscriptionId: string, until: Date): Promise<void> {
+    // A trial on a running subscription moves the next invoice to its end without charging now.
+    await this.stripe.subscriptions.update(subscriptionId, {
+      trial_end: Math.floor(until.getTime() / 1000),
+      proration_behavior: 'none',
+    });
+  }
+
+  async createCoupon(input: CouponInput): Promise<{ couponId: string }> {
+    const c = await this.stripe.coupons.create({
+      name: input.code,
+      duration: 'once',
+      ...(input.kind === 'percent_off'
+        ? { percent_off: input.value }
+        : { amount_off: input.value, currency: 'eur' }),
+      ...(input.maxRedemptions ? { max_redemptions: input.maxRedemptions } : {}),
+      ...(input.validUntil ? { redeem_by: Math.floor(input.validUntil.getTime() / 1000) } : {}),
+      metadata: { promoCode: input.code },
+    });
+    return { couponId: c.id };
+  }
+
+  async deleteCoupon(couponId: string): Promise<void> {
+    try {
+      await this.stripe.coupons.del(couponId);
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'resource_missing') throw err;
+    }
   }
 
   async portalUrl(customerId: string, returnUrl: string): Promise<string> {

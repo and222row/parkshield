@@ -1,49 +1,12 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   expectAccessible,
   ownerWithActiveDecal,
   scannerPage,
-  sql,
+  staffBrowser,
   uniqueEmail,
   waitForMail,
 } from './helpers';
-
-const OPS_URL = process.env.OPS_BASE_URL ?? 'http://localhost:3001';
-
-/**
- * A signed-in staff member in a fresh browser. The passkey ceremony itself is covered in sprint8.spec;
- * here the staff session is created directly, exactly as api-ops would after a passkey sign-in.
- */
-async function staffBrowser(browser: Browser, name: string, roles: string[]): Promise<Page> {
-  const email = `${name}-${Date.now()}${Math.floor(Math.random() * 1000)}@parkshield.de`;
-  const [u] = await sql(
-    `INSERT INTO users (email, kind, display_name, email_verified_at) VALUES ($1, 'staff', $2, now()) RETURNING id`,
-    [email, name],
-  );
-  for (const r of roles)
-    await sql('INSERT INTO staff_role_assignments (user_id, role_code) VALUES ($1, $2)', [u.id, r]);
-  const token = randomBytes(32).toString('base64url');
-  const csrf = randomBytes(18).toString('base64url');
-  await sql(
-    `INSERT INTO sessions (user_id, token_hash, is_staff, expires_at) VALUES ($1, $2, true, now() + interval '30 minutes')`,
-    [u.id, createHash('sha256').update(token).digest()],
-  );
-  const ctx = await browser.newContext({ locale: 'de-DE', baseURL: OPS_URL });
-  const host = new URL(OPS_URL).hostname;
-  await ctx.addCookies([
-    {
-      name: 'ps_ops_session',
-      value: token,
-      domain: host,
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Strict',
-    },
-    { name: 'ps_ops_csrf', value: csrf, domain: host, path: '/', sameSite: 'Strict' },
-  ]);
-  return ctx.newPage();
-}
 
 test('support opens Customer 360 and the trace; break-glass needs a second person (US-35, US-36)', async ({
   page,

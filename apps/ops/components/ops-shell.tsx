@@ -51,6 +51,16 @@ export function OpsShell({ me, children }: { me: StaffMe; children: ReactNode })
     { href: '/missbrauch', label: t('ops.navAbuse'), show: can('abuse.moderate') },
     { href: '/missbrauch/pruefung', label: t('ops.navReview'), show: can('moderation.review') },
     { href: '/missbrauch/woerter', label: t('ops.navWords'), show: can('abuse.moderate') },
+    { href: '/bestellungen', label: t('ops.navOrders'), show: can('orders.manage') },
+    {
+      href: '/partner',
+      label: t('ops.navPartners'),
+      show: can('partners.manage') || can('tokens.manage'),
+    },
+    { href: '/gutscheine', label: t('ops.navPromos'), show: can('promo.manage') },
+    { href: '/einstellungen', label: t('ops.navSettings'), show: can('settings.edit') },
+    { href: '/einstellungen/anbieter', label: t('ops.navHealth'), show: can('settings.edit') },
+    { href: '/audit', label: t('ops.navAudit'), show: can('audit.read') },
     { href: '/mitarbeitende', label: t('ops.navStaff'), show: can('staff.manage') },
   ];
   return (

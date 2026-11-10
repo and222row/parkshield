@@ -202,6 +202,14 @@ export interface AuditLogs {
   meta: Generated<Json>;
 }
 
+export interface AuditStreamState {
+  id: Generated<number>;
+  last_hash: Generated<string>;
+  last_id: Generated<Int8>;
+  last_key: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface BreakGlassRequests {
   approved_at: Timestamp | null;
   approver_id: string | null;
@@ -285,8 +293,11 @@ export interface DecalOrders {
   included_in_plan: Generated<boolean>;
   is_replacement: Generated<boolean>;
   key_version: Generated<number>;
+  ops_note: string | null;
   organization_id: string | null;
   print_partner_ref: string | null;
+  reprint_of: string | null;
+  returned_at: Timestamp | null;
   shipped_at: Timestamp | null;
   shipping_address_enc: Buffer;
   status: Generated<OrderStatus>;
@@ -337,6 +348,64 @@ export interface MagicLinkTokens {
   token_hash: Buffer;
   used_at: Timestamp | null;
   user_id: string;
+}
+
+export interface MetricsActivationFunnel {
+  cohort: Timestamp | null;
+  emergency_contact: number | null;
+  paid: number | null;
+  second_channel: number | null;
+  shipped: number | null;
+  tested: number | null;
+}
+
+export interface MetricsChurnMonthly {
+  active_at_start: number | null;
+  churn_rate: Numeric | null;
+  churned: number | null;
+  month: Timestamp | null;
+}
+
+export interface MetricsDeliveryDaily {
+  ack_rate: Numeric | null;
+  acknowledged: number | null;
+  alerts: number | null;
+  day: Timestamp | null;
+  delivery_rate: Numeric | null;
+  reached: number | null;
+}
+
+export interface MetricsIosPush {
+  ios_users: number | null;
+  share: Numeric | null;
+  with_working_push: number | null;
+}
+
+export interface MetricsMessageCostDaily {
+  channel: ChannelType | null;
+  cost_eur: Numeric | null;
+  day: Timestamp | null;
+  deliveries: number | null;
+  failed: number | null;
+}
+
+export interface MetricsProtectionScoreDistribution {
+  customers: number | null;
+  score: number | null;
+}
+
+export interface MetricsRefundsMonthly {
+  kind: RefundKind | null;
+  month: Timestamp | null;
+  refund_gross_cents: Int8 | null;
+  refunds: number | null;
+}
+
+export interface MetricsRevenueByPlan {
+  arr_gross_cents: Int8 | null;
+  live_subscriptions: number | null;
+  mrr_gross_cents: Int8 | null;
+  plan: PlanCode | null;
 }
 
 export interface ModerationReviews {
@@ -447,6 +516,13 @@ export interface PromoRedemptions {
   subscription_id: string;
 }
 
+export interface ProviderHealthAlerts {
+  check_key: string;
+  level: string;
+  notified_at: Timestamp | null;
+  since: Generated<Timestamp>;
+}
+
 export interface ProviderStatusEvents {
   captured_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -491,13 +567,17 @@ export interface QrTokens {
 
 export interface Refunds {
   approved_by: string | null;
+  contract_no: string | null;
   created_at: Generated<Timestamp>;
   credit_note_no: string | null;
+  days_used: number | null;
   decal_cost_cents: Generated<number>;
   decal_order_id: string | null;
   id: Generated<string>;
   kind: RefundKind;
   paid_gross_cents: number;
+  period_days: number | null;
+  reason: string | null;
   refund_gross_cents: number;
   requested_by: string | null;
   stripe_refund_id: string | null;
@@ -572,8 +652,12 @@ export interface TokenBatches {
   id: Generated<string>;
   note: string | null;
   partner_id: string | null;
+  print_partner_ref: string | null;
+  printed_at: Timestamp | null;
   promo_code_id: string | null;
   quantity: number;
+  shipped_at: Timestamp | null;
+  status: Generated<string>;
 }
 
 export interface UsageCounters {
@@ -669,6 +753,7 @@ export interface DB {
   alerts: Alerts;
   app_settings: AppSettings;
   audit_logs: AuditLogs;
+  audit_stream_state: AuditStreamState;
   break_glass_requests: BreakGlassRequests;
   business_waitlist: BusinessWaitlist;
   consents: Consents;
@@ -680,6 +765,14 @@ export interface DB {
   emergency_contacts: EmergencyContacts;
   filter_word_lists: FilterWordLists;
   magic_link_tokens: MagicLinkTokens;
+  "metrics.activation_funnel": MetricsActivationFunnel;
+  "metrics.churn_monthly": MetricsChurnMonthly;
+  "metrics.delivery_daily": MetricsDeliveryDaily;
+  "metrics.ios_push": MetricsIosPush;
+  "metrics.message_cost_daily": MetricsMessageCostDaily;
+  "metrics.protection_score_distribution": MetricsProtectionScoreDistribution;
+  "metrics.refunds_monthly": MetricsRefundsMonthly;
+  "metrics.revenue_by_plan": MetricsRevenueByPlan;
   moderation_reviews: ModerationReviews;
   notification_rules: NotificationRules;
   organization_members: OrganizationMembers;
@@ -691,6 +784,7 @@ export interface DB {
   plans: Plans;
   promo_codes: PromoCodes;
   promo_redemptions: PromoRedemptions;
+  provider_health_alerts: ProviderHealthAlerts;
   provider_status_events: ProviderStatusEvents;
   push_subscriptions: PushSubscriptions;
   qr_tokens: QrTokens;

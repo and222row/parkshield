@@ -52,15 +52,9 @@ function draw(doc: PDFKit.PDFDocument, spec: DecalSpec, ox: number, oy: number, 
   }
 }
 
-/** Print-ready file for the print shop: CMYK, 3 mm bleed, TrimBox/BleedBox set (US-10). */
-export function renderPrintPdf(spec: DecalSpec, title: string): Promise<Buffer> {
+function printPage(doc: PDFKit.PDFDocument, spec: DecalSpec) {
   const w = spec.width + 2 * BLEED_MM;
   const h = spec.height + 2 * BLEED_MM;
-  const doc = new PDFDocument({
-    size: [w * PT, h * PT],
-    margin: 0,
-    info: { Title: title, Creator: 'ParkShield' },
-  });
   const page = doc.page as unknown as { dictionary: { data: Record<string, unknown> } };
   page.dictionary.data.TrimBox = [
     BLEED_MM * PT,
@@ -71,6 +65,38 @@ export function renderPrintPdf(spec: DecalSpec, title: string): Promise<Buffer> 
   page.dictionary.data.BleedBox = [0, 0, w * PT, h * PT];
   doc.rect(0, 0, w * PT, h * PT).fill(spec.background.cmyk); // background runs into the bleed
   draw(doc, spec, BLEED_MM, BLEED_MM, 'cmyk');
+}
+
+const printSize = (spec: DecalSpec): [number, number] => [
+  (spec.width + 2 * BLEED_MM) * PT,
+  (spec.height + 2 * BLEED_MM) * PT,
+];
+
+/** Print-ready file for the print shop: CMYK, 3 mm bleed, TrimBox/BleedBox set (US-10). */
+export function renderPrintPdf(spec: DecalSpec, title: string): Promise<Buffer> {
+  const doc = new PDFDocument({
+    size: printSize(spec),
+    margin: 0,
+    info: { Title: title, Creator: 'ParkShield' },
+  });
+  printPage(doc, spec);
+  return toBuffer(doc);
+}
+
+/** AD-07: one print file for a pre-printed batch, one decal per page, same print rules. */
+export function renderPrintBatchPdf(specs: DecalSpec[], title: string): Promise<Buffer> {
+  const [first, ...rest] = specs;
+  if (!first) throw new Error('empty batch');
+  const doc = new PDFDocument({
+    size: printSize(first),
+    margin: 0,
+    info: { Title: title, Creator: 'ParkShield' },
+  });
+  printPage(doc, first);
+  for (const spec of rest) {
+    doc.addPage({ size: printSize(spec), margin: 0 });
+    printPage(doc, spec);
+  }
   return toBuffer(doc);
 }
 

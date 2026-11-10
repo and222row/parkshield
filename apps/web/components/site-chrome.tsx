@@ -43,6 +43,7 @@ export function SiteHeader() {
 export function SiteFooter() {
   const { t } = useI18n();
   const links: [string, string][] = [
+    ['/hilfe', t('common.footer.help')],
     ['/impressum', t('common.footer.impressum')],
     ['/datenschutz', t('common.footer.privacy')],
     ['/agb', t('common.footer.terms')],

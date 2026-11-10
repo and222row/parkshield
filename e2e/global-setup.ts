@@ -73,6 +73,10 @@ async function warmUp() {
       '/datenschutz-anfrage',
       '/dev/checkout',
       '/s/0000000000',
+      '/hilfe',
+      '/hilfe/so-funktioniert-parkshield',
+      '/hilfe/kontakt',
+      '/aktivieren',
     ].map((p) => web + p),
     ...[
       '/',
@@ -88,6 +92,16 @@ async function warmUp() {
       '/missbrauch/pruefung',
       '/missbrauch/woerter',
       '/mitarbeitende',
+      '/bestellungen',
+      `/bestellungen/${id}`,
+      '/partner',
+      `/kunden/${id}/erstattung`,
+      '/gutscheine',
+      '/einstellungen',
+      '/einstellungen/anbieter',
+      '/audit',
+      '/zammad',
+      '/kunden/zammad',
     ].map((p) => ops + p),
   ];
   for (const url of routes) {

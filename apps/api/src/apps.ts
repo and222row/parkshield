@@ -20,6 +20,23 @@ import {
   OpsDsrController,
 } from './ops/ops-tools.controller';
 import { OpsStaffController } from './ops/ops-staff.controller';
+import {
+  OpsAuditController,
+  OpsCustomerSummaryController,
+  OpsOrdersController,
+  OpsPartnersController,
+  OpsPromoController,
+  OpsRefundsController,
+  OpsSettingsController,
+} from './ops/ops-back-office.controller';
+import { AuditStreamService, AuditViewService } from './ops/audit.service';
+import { FulfilmentService } from './ops/fulfilment.service';
+import { PromoService } from './ops/promo.service';
+import { ProviderHealthService } from './ops/provider-health.service';
+import { SettingsAdminService } from './ops/settings-admin.service';
+import { RefundsService } from './billing/refunds.service';
+import { SupportController } from './support/support.controller';
+import { SupportService } from './support/support.service';
 import { StaffGuard } from './ops/staff.guard';
 import { StaffService } from './ops/staff.service';
 import { PrivacyController } from './privacy/privacy.controller';
@@ -43,7 +60,7 @@ import { EntitlementService } from './billing/entitlements.service';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { TokensService } from './vehicles/tokens.service';
-import { VehiclesController } from './vehicles/vehicles.controller';
+import { ClaimController, VehiclesController } from './vehicles/vehicles.controller';
 import { VehiclesService } from './vehicles/vehicles.service';
 import { ChannelsController, WhatsAppWebhookController } from './channels/channels.controller';
 import { ChannelsService } from './channels/channels.service';
@@ -91,10 +108,23 @@ const domainProviders = [
   HistoryService,
   PrivacyService,
   WordListsService,
+  RefundsService,
 ];
 
-/** Ops back-office services (api-ops; the worker uses the GDPR deadline reminder). */
-const opsProviders = [StaffService, CustomersService, BreakGlassService, DsrService, AbuseService];
+/** Ops back-office services (api-ops; the worker uses some of them for its jobs). */
+const opsProviders = [
+  StaffService,
+  CustomersService,
+  BreakGlassService,
+  DsrService,
+  AbuseService,
+  FulfilmentService,
+  PromoService,
+  SettingsAdminService,
+  ProviderHealthService,
+  AuditStreamService,
+  AuditViewService,
+];
 
 /** Public API: scanner, owner portal, webhooks. Never registers ops routes (AD-01). */
 @Module({})
@@ -122,11 +152,14 @@ export class PublicAppModule {
         EmergencyContactInvitationsController,
         HistoryController,
         PrivacyController,
+        ClaimController,
+        SupportController,
         ...(devRoutes ? [DevController] : []),
       ],
       providers: [
         ...sharedProviders,
         ...domainProviders,
+        SupportService,
         SessionGuard,
         AuthService,
         PasskeyService,
@@ -151,6 +184,13 @@ export class OpsAppModule {
         OpsBreakGlassController,
         OpsDsrController,
         OpsAbuseController,
+        OpsCustomerSummaryController,
+        OpsOrdersController,
+        OpsPartnersController,
+        OpsRefundsController,
+        OpsPromoController,
+        OpsSettingsController,
+        OpsAuditController,
       ],
       providers: [
         ...sharedProviders,
@@ -175,6 +215,8 @@ export class WorkerModule {
         ...domainProviders,
         StaffService,
         DsrService,
+        ProviderHealthService,
+        AuditStreamService,
         OutboxService,
         SchedulerService,
         WorkerBootstrap,

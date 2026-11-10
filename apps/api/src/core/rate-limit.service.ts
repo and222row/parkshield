@@ -53,6 +53,9 @@ export const RATE_LIMITS = {
   'scan.not_found': { max: 30, windowSeconds: 60 },
   // US-24: invitations e-mail third parties, so an account cannot be used to send many of them.
   'contact.invite': { max: 5, windowSeconds: 86_400 },
+  // US-44: the contact form creates Zammad tickets.
+  'support.ip': { max: 10, windowSeconds: 3600 },
+  'support.email': { max: 5, windowSeconds: 3600 },
 } as const;
 export type RateLimitName = keyof typeof RATE_LIMITS;
 

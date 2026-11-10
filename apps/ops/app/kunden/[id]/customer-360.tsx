@@ -22,6 +22,7 @@ export interface CustomerView {
   };
   protection: { percent: number; steps: Record<string, boolean> };
   subscriptions: {
+    id: string;
     plan: string;
     status: string;
     contractNo: string | null;
@@ -103,6 +104,8 @@ export function Customer360({ me, data }: { me: StaffMe; data: CustomerView }) {
   const { t, locale } = useI18n();
   const canRequest = me.permissions.includes('pii.decrypt_request');
   const canTrace = me.permissions.includes('alerts.read_metadata');
+  const canRefund = me.permissions.includes('billing.refund');
+  const canOrders = me.permissions.includes('orders.manage');
   const d = (v: string | null) => fmt(v, locale);
   const c = data.customer;
 
@@ -138,11 +141,23 @@ export function Customer360({ me, data }: { me: StaffMe; data: CustomerView }) {
             {data.subscriptions.length === 0 ? (
               <Text muted>{t('opsCustomers.noSubscription')}</Text>
             ) : (
-              <ul className="text-sm">
-                {data.subscriptions.map((s, i) => (
-                  <li key={i}>
+              <ul className="flex flex-col gap-1 text-sm">
+                {data.subscriptions.map((s) => (
+                  <li key={s.id}>
                     <b>{s.plan}</b> · {s.status} · {s.contractNo ?? '–'} · {d(s.periodEnd)}
                     {s.cancelAtPeriodEnd ? ' · ✕' : ''}
+                    {canRefund && (
+                      <>
+                        {' · '}
+                        <Link
+                          href={`/kunden/${c.id}/erstattung?abo=${s.id}`}
+                          className="text-primary underline"
+                        >
+                          {t('opsRefund.open')}
+                          <span className="sr-only"> ({s.contractNo ?? s.plan})</span>
+                        </Link>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -257,6 +272,27 @@ export function Customer360({ me, data }: { me: StaffMe; data: CustomerView }) {
                 {o.replacement ? '· Ersatz' : ''} · {t('opsCustomers.address')}:{' '}
                 <span className="font-mono">{o.addressMasked ?? '–'}</span>{' '}
                 {o.trackingNumber ? `· ${o.trackingNumber}` : ''}
+                {canOrders && (
+                  <>
+                    {' · '}
+                    <Link href={`/bestellungen/${o.id}`} className="text-primary underline">
+                      {t('opsOrders.open')}
+                      <span className="sr-only"> ({d(o.createdAt)})</span>
+                    </Link>
+                  </>
+                )}
+                {canRefund && o.totalCents > 0 && (
+                  <>
+                    {' · '}
+                    <Link
+                      href={`/kunden/${c.id}/erstattung?bestellung=${o.id}`}
+                      className="text-primary underline"
+                    >
+                      {t('opsRefund.open')}
+                      <span className="sr-only"> ({d(o.createdAt)})</span>
+                    </Link>
+                  </>
+                )}
                 {canRequest && o.addressMasked && (
                   <RevealRequest
                     target="decal_orders.shipping_address"

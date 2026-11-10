@@ -24,6 +24,7 @@ const Payload = z.object({
       z.object({
         changes: z.array(
           z.object({
+            field: z.string().optional(),
             value: z
               .object({
                 statuses: z.array(z.unknown()).optional(),
@@ -36,6 +37,11 @@ const Payload = z.object({
     )
     .default([]),
 });
+const HEALTH_FIELDS = new Set([
+  'phone_number_quality_update',
+  'message_template_status_update',
+  'message_template_quality_update',
+]);
 const REPLY_PAYLOAD = /^ack:([A-Za-z0-9_-]{20,100}):(coming|in_30_min|not_nearby)$/;
 
 const RANK = { queued: 0, sent: 1, delivered: 2, read: 3 } as const;
@@ -55,6 +61,10 @@ export class WhatsAppWebhookService {
     let updated = 0;
     for (const entry of parsed.data.entry) {
       for (const change of entry.changes) {
+        if (change.field && HEALTH_FIELDS.has(change.field)) {
+          updated += await this.health(change.field, change.value);
+          continue;
+        }
         for (const raw of change.value.statuses ?? []) {
           const s = Status.safeParse(raw);
           if (s.success) updated += await this.apply(s.data);
@@ -74,6 +84,36 @@ export class WhatsAppWebhookService {
       }
     }
     return updated;
+  }
+
+  /**
+   * AD-16: the number's quality and the template status, shown on the provider health screen. A
+   * flagged number or a paused template means WhatsApp may stop delivering soon (kill switch, NT-12).
+   */
+  private async health(field: string, value: Record<string, unknown>): Promise<number> {
+    const event = String(value.event ?? '').slice(0, 40);
+    const rows: { metric: string; value: string }[] = [];
+    if (field === 'phone_number_quality_update') {
+      if (event === 'FLAGGED') rows.push({ metric: 'meta_quality_rating', value: 'RED' });
+      if (event === 'UNFLAGGED') rows.push({ metric: 'meta_quality_rating', value: 'GREEN' });
+      if (value.current_limit)
+        rows.push({ metric: 'messaging_limit', value: String(value.current_limit).slice(0, 40) });
+    } else if (field === 'message_template_status_update') {
+      const name = String(value.message_template_name ?? 'unknown').slice(0, 24);
+      rows.push({ metric: `template_status:${name}`, value: event });
+    } else if (field === 'message_template_quality_update') {
+      const name = String(value.message_template_name ?? 'unknown').slice(0, 24);
+      rows.push({
+        metric: `template_quality:${name}`,
+        value: String(value.new_quality_score ?? '').slice(0, 20),
+      });
+    }
+    if (!rows.length) return 0;
+    await this.db
+      .insertInto('provider_status_events')
+      .values(rows.map((r) => ({ provider: '360dialog', ...r })))
+      .execute();
+    return rows.length;
   }
 
   private async apply(s: z.infer<typeof Status>): Promise<number> {

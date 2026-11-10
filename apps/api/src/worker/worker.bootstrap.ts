@@ -3,7 +3,9 @@ import { sql } from 'kysely';
 import { BillingService } from '../billing/billing.service';
 import type { Db } from '../core/core.module';
 import { DB } from '../core/tokens';
+import { AuditStreamService } from '../ops/audit.service';
 import { DsrService } from '../ops/dsr.service';
+import { ProviderHealthService } from '../ops/provider-health.service';
 import { PrivacyService } from '../privacy/privacy.service';
 import { DispatchService } from '../notifications/dispatch.service';
 import { ESCALATE_TOPIC, EscalationService } from '../notifications/escalation.service';
@@ -28,6 +30,8 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
     @Inject(RemindersService) private readonly reminders: RemindersService,
     @Inject(PrivacyService) private readonly privacy: PrivacyService,
     @Inject(DsrService) private readonly dsr: DsrService,
+    @Inject(AuditStreamService) private readonly audit: AuditStreamService,
+    @Inject(ProviderHealthService) private readonly health: ProviderHealthService,
     @Inject(DB) private readonly db: Db,
   ) {}
 
@@ -71,6 +75,20 @@ export class WorkerBootstrap implements OnApplicationBootstrap {
       everyMs: 10 * 60_000,
       quiet: true,
       run: () => this.privacy.processDue(),
+    });
+    // US-42: copy new audit rows to the Object Lock bucket, a few seconds behind live.
+    this.scheduler.every({
+      name: 'audit.stream',
+      everyMs: 5_000,
+      quiet: true,
+      run: () => this.audit.flush(),
+    });
+    // US-41: provider health checks; the team gets a mail when one gets worse or recovers.
+    this.scheduler.every({
+      name: 'providers.health',
+      everyMs: 5 * 60_000,
+      quiet: true,
+      run: () => this.health.evaluate(),
     });
     // Escalations fall due at escalate_at; the sweeper picks them up within seconds (02-arch §3 step 8).
     this.scheduler.every({

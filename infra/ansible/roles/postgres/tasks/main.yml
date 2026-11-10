@@ -88,6 +88,16 @@
         owner: '{{ postgres_app_user }}'
       become_user: postgres
 
+    # US-43 / AD-18: the migration creates metabase_ro (NOLOGIN) and grants it the metrics views
+    # only; here it gets its login and password. It replicates to the read replica Metabase uses.
+    - name: Metabase read-only role (metrics views only, no table, no encrypted column)
+      community.postgresql.postgresql_user:
+        name: '{{ postgres_metabase_user }}'
+        password: '{{ postgres_metabase_password }}'
+        role_attr_flags: LOGIN,NOSUPERUSER,NOCREATEDB,NOCREATEROLE
+      become_user: postgres
+      no_log: true
+
     - name: Replication role
       community.postgresql.postgresql_user:
         name: replicator

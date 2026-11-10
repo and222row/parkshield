@@ -4,6 +4,33 @@ export const PAYMENTS = Symbol('PAYMENTS');
 export const PRINT = Symbol('PRINT');
 export const PUSH = Symbol('PUSH');
 export const WHATSAPP = Symbol('WHATSAPP');
+export const AUDIT_BUCKET = Symbol('AUDIT_BUCKET');
+export const SUPPORT_DESK = Symbol('SUPPORT_DESK');
+
+/**
+ * Write-once object storage for the audit stream (AD-17): S3 with Object Lock in COMPLIANCE mode.
+ * `put` never replaces an object: the same content again is "exists", different content an error.
+ */
+export interface AuditBucket {
+  put(key: string, body: Buffer, retainUntil: Date): Promise<'created' | 'exists'>;
+  get(key: string): Promise<Buffer | null>;
+  list(prefix: string): Promise<string[]>;
+}
+
+export interface SupportTicket {
+  email: string;
+  name: string | null;
+  subject: string;
+  body: string;
+  /** e.g. "plus" for the 48 h reply promise, the topic, "signed_in". */
+  tags: string[];
+  locale: 'de' | 'en';
+}
+
+/** Zammad is the only ticket store (AD-20): the contact form creates the ticket there directly. */
+export interface SupportDesk {
+  createTicket(ticket: SupportTicket): Promise<{ number: string }>;
+}
 
 export interface PushTarget {
   endpoint: string;
@@ -141,7 +168,37 @@ export type BillingEvent =
     }
   | { kind: 'ignored'; eventId: string; type: string };
 
+/** What was paid for a subscription period or a one-time order, and how much went back already. */
+export interface Charge {
+  paymentIntentId: string;
+  amountCents: number;
+  refundedCents: number;
+}
+
+export interface CouponInput {
+  code: string;
+  kind: 'percent_off' | 'amount_off';
+  value: number;
+  maxRedemptions: number | null;
+  validUntil: Date | null;
+}
+
 export interface Payments {
+  /** Latest paid charge of a subscription, or the charge of a one-time payment. */
+  findCharge(ref: { subscriptionId: string } | { paymentIntentId: string }): Promise<Charge | null>;
+  refund(input: {
+    paymentIntentId: string;
+    amountCents: number;
+    metadata: Record<string, string>;
+  }): Promise<{ refundId: string }>;
+  /** Withdrawal (AD-12): the subscription ends now, without proration by the provider. */
+  cancelNow(subscriptionId: string): Promise<void>;
+  /** "Extra months" promo: the next renewal moves to `until`, free of charge. */
+  extendPeriod(subscriptionId: string, until: Date): Promise<void>;
+  /** AD-13: promo codes are synced to Stripe Coupons (one-off discount on the first year). */
+  createCoupon(input: CouponInput): Promise<{ couponId: string }>;
+  /** Stops new redemptions; existing discounts stay. */
+  deleteCoupon(couponId: string): Promise<void>;
   ensureCustomer(input: { email: string; userId: string; locale: 'de' | 'en' }): Promise<string>;
   /** Account deletion: removes the customer and cancels subscriptions immediately. Idempotent. */
   deleteCustomer(customerId: string): Promise<{ reference: string }>;

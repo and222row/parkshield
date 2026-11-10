@@ -15,7 +15,7 @@ import type { AuthContext } from '../auth/session.service';
 import { ZodPipe } from '../core/zod.pipe';
 import { OrdersService } from './orders.service';
 
-const Address = z.object({
+export const Address = z.object({
   name: z.string().trim().min(2).max(80),
   line1: z.string().trim().min(3).max(100),
   line2: z.string().trim().max(100).optional(),

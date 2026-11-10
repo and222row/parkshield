@@ -34,7 +34,10 @@ const latin1 = (s: string) =>
     .replace(/[‘’‚]/g, "'")
     .replace(/[–—]/g, '-')
     .replace(/•/g, '*')
-    .replace(/[^\x20-\x7e\xa0-\xff]/g, '?');
+    .replaceAll(String.fromCharCode(0x202f), '\xa0') // narrow no-break space (Intl number formats)
+    // WinAnsiEncoding puts the euro sign at 0x80 (credit notes, US-40).
+    .replace(/€/g, '\x80')
+    .replace(/[^\x20-\x7e\x80\xa0-\xff]/g, '?');
 
 function wrap(line: string): string[] {
   const out: string[] = [];

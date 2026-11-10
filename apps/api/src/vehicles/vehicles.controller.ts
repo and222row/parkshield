@@ -6,21 +6,25 @@ import {
   Get,
   HttpCode,
   Inject,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { CTA_MAX, DECAL_PRODUCTS, DECAL_TEMPLATES } from '@parkshield/shared';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CurrentUser, SessionGuard } from '../auth/guards';
 import type { AuthContext } from '../auth/session.service';
 import type { Env } from '../config/env';
+import { truncateIp } from '../core/ip';
+import { RateLimitService } from '../core/rate-limit.service';
 import { ENV } from '../core/tokens';
 import { ZodPipe } from '../core/zod.pipe';
 import { layoutDecal } from '../decal/layout';
@@ -50,6 +54,7 @@ const Reissue = z.object({
   confirm: z.literal(true),
   reason: z.enum(['leaked', 'car_sold', 'damaged', 'other']).default('other'),
 });
+const Claim = z.object({ code: z.string().trim().min(10).max(16) });
 const Preview = Design.partial().extend({
   product: z.enum(DECAL_PRODUCTS).default('uv_vinyl_sticker'),
 });
@@ -110,6 +115,17 @@ export class VehiclesController {
     @Body(new ZodPipe(Reissue)) body: z.infer<typeof Reissue>,
   ) {
     return this.vehicles.revokeAndReissue(user.userId, id, body.reason);
+  }
+
+  /** AD-07: put a pre-printed partner decal on this vehicle. */
+  @Post(':id/claim')
+  @HttpCode(200)
+  claim(
+    @CurrentUser() user: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodPipe(Claim)) body: z.infer<typeof Claim>,
+  ) {
+    return this.vehicles.claim(user.userId, id, body.code);
   }
 
   /** US-12: "Aufkleber testen". */
@@ -175,5 +191,27 @@ export class VehiclesController {
       .header('content-disposition', 'attachment; filename="parkshield-aufkleber.pdf"')
       .header('cache-control', 'no-store')
       .send(pdf);
+  }
+}
+
+/**
+ * "Set up this decal" for a pre-printed partner decal (AD-07): who handed it out and which promo
+ * code comes with it. Misses are rate-limited like scans of unknown codes.
+ */
+@Controller('v1/claim')
+export class ClaimController {
+  constructor(
+    @Inject(VehiclesService) private readonly vehicles: VehiclesService,
+    @Inject(RateLimitService) private readonly limits: RateLimitService,
+  ) {}
+
+  @Get(':code')
+  async info(@Param('code') code: string, @Req() req: FastifyRequest) {
+    const t = await this.vehicles.claimable(code);
+    if (!t) {
+      await this.limits.enforce('scan.not_found', truncateIp(req.ip));
+      throw new NotFoundException({ error: 'code_not_claimable' });
+    }
+    return { partner: t.partner, promoCode: t.promoCode };
   }
 }

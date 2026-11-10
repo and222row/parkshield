@@ -63,6 +63,21 @@ export function renderInactive(locale: Locale): string {
   );
 }
 
+/**
+ * AD-07: a pre-printed partner decal nobody has set up. The owner sets it up; a stranger learns that
+ * this decal cannot reach anyone yet. The code goes in the fragment, so no server log ever sees it.
+ */
+export function renderUnclaimed(locale: Locale, code: string): string {
+  const s = messages[locale].scanner;
+  return shell(
+    locale,
+    s.unclaimedTitle,
+    `<main><div class="top"><span class="brand">ParkShield</span></div><h1>${esc(s.unclaimedTitle)}</h1>
+<p>${esc(s.unclaimedText)}</p><p><a class="primary" href="/aktivieren#c=${encodeURIComponent(code)}">${esc(s.unclaimedButton)}</a></p>
+<p class="note info">${esc(s.unclaimedStranger)}</p><p class="note warn">${esc(s.emergency)}</p>${footer(s)}</main>`,
+  );
+}
+
 export function renderRateLimited(locale: Locale): string {
   const s = messages[locale].scanner;
   return shell(

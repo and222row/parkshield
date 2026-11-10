@@ -4,8 +4,9 @@ import { sql } from 'kysely';
 import { EntitlementService } from '../billing/entitlements.service';
 import type { Db } from '../core/core.module';
 import type { FieldCrypto } from '../core/crypto';
+import { sha256 } from '../core/crypto';
 import { CRYPTO, DB } from '../core/tokens';
-import { TokensService } from './tokens.service';
+import { normalizeCode, TokensService } from './tokens.service';
 
 export interface VehicleInput {
   nickname: string;
@@ -216,6 +217,69 @@ export class VehiclesService {
         .set({ cta_header: token.cta_header, design_template_id: token.design_template_id })
         .where('id', '=', fresh.id)
         .execute();
+    });
+    return this.get(userId, vehicleId);
+  }
+
+  /**
+   * AD-07: a pre-printed partner decal that is not yet anyone's. Unknown, revoked and already
+   * claimed codes all return null.
+   */
+  async claimable(rawCode: string) {
+    const code = normalizeCode(rawCode);
+    if (!code) return null;
+    return (
+      (await this.db
+        .selectFrom('qr_tokens as t')
+        .innerJoin('token_batches as b', 'b.id', 't.batch_id')
+        .leftJoin('partners as p', 'p.id', 'b.partner_id')
+        .leftJoin('promo_codes as c', (j) =>
+          j
+            .onRef('c.id', '=', 'b.promo_code_id')
+            .on('c.is_active', '=', true)
+            .on((eb) =>
+              eb.or([eb('c.valid_until', 'is', null), eb('c.valid_until', '>', sql<Date>`now()`)]),
+            ),
+        )
+        .select(['t.id', 'p.name as partner', 'c.code as promoCode'])
+        .where('t.code_hash', '=', sha256(code))
+        .where('t.vehicle_id', 'is', null)
+        .where('t.status', 'in', ['generated', 'printed', 'shipped'])
+        .executeTakeFirst()) ?? null
+    );
+  }
+
+  /**
+   * The owner sticks a pre-printed decal on this vehicle: it becomes the vehicle's code and the
+   * previous one stops working. Like any decal it is active after the owner's test scan (US-12).
+   */
+  async claim(userId: string, vehicleId: string, rawCode: string) {
+    await this.entitlements.require(userId);
+    const v = await this.get(userId, vehicleId);
+    const token = await this.claimable(rawCode);
+    if (!token) throw new NotFoundException({ error: 'code_not_claimable' });
+    await this.db.transaction().execute(async (trx) => {
+      const r = await trx
+        .updateTable('qr_tokens')
+        .set({ vehicle_id: vehicleId, status: 'shipped' })
+        .where('id', '=', token.id)
+        .where('vehicle_id', 'is', null)
+        .executeTakeFirst();
+      if (!Number(r.numUpdatedRows)) throw new ConflictException({ error: 'code_not_claimable' });
+      if (v.decal) {
+        await trx
+          .updateTable('qr_tokens')
+          .set({
+            status: 'revoked',
+            revoked_at: sql`now()`,
+            revoke_reason: 'replaced_by_preprinted',
+            test_window_until: null,
+          })
+          .where('vehicle_id', '=', vehicleId)
+          .where('id', '<>', token.id)
+          .where('status', '<>', 'revoked')
+          .execute();
+      }
     });
     return this.get(userId, vehicleId);
   }

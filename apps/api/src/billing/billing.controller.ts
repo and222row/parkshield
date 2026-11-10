@@ -6,21 +6,26 @@ import {
   HttpCode,
   Inject,
   InternalServerErrorException,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
+  Res,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { CurrentUser, SessionGuard } from '../auth/guards';
 import type { AuthContext } from '../auth/session.service';
+import type { Db } from '../core/core.module';
 import { truncateIp } from '../core/ip';
-import { LOGGER } from '../core/tokens';
+import { DB, LOGGER } from '../core/tokens';
 import { ZodPipe } from '../core/zod.pipe';
 import { PAYMENTS, type Payments } from '../providers/ports';
 import { BillingService } from './billing.service';
+import { RefundsService } from './refunds.service';
 
 const Checkout = z.object({
   plan: z.enum(['plus', 'premium']),
@@ -41,7 +46,10 @@ const CancelWithoutLogin = CancelKind.extend({
 
 @Controller('v1')
 export class BillingController {
-  constructor(@Inject(BillingService) private readonly billing: BillingService) {}
+  constructor(
+    @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(RefundsService) private readonly refunds: RefundsService,
+  ) {}
 
   @Get('plans')
   plans() {
@@ -77,6 +85,37 @@ export class BillingController {
     return { invoices: await this.billing.invoices(user.userId) };
   }
 
+  /** US-40: credit notes (Gutschriften) for refunds, next to the invoices. */
+  @Get('billing/credit-notes')
+  @UseGuards(SessionGuard)
+  async creditNotes(@CurrentUser() user: AuthContext) {
+    const rows = await this.refunds.list({ userId: user.userId });
+    return {
+      creditNotes: rows.map((r) => ({
+        id: r.id,
+        number: r.creditNoteNo,
+        kind: r.kind,
+        amountCents: r.refundCents,
+        createdAt: r.createdAt,
+      })),
+    };
+  }
+
+  @Get('billing/credit-notes/:id/pdf')
+  @UseGuards(SessionGuard)
+  async creditNotePdf(
+    @CurrentUser() user: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const { file, number } = await this.refunds.creditNotePdf(id, user.userId);
+    return reply
+      .header('content-type', 'application/pdf')
+      .header('content-disposition', `attachment; filename="${number}.pdf"`)
+      .header('cache-control', 'no-store')
+      .send(file);
+  }
+
   @Post('billing/cancel')
   @HttpCode(200)
   @UseGuards(SessionGuard)
@@ -106,6 +145,7 @@ export class StripeWebhookController {
     @Inject(BillingService) private readonly billing: BillingService,
     @Inject(PAYMENTS) private readonly payments: Payments,
     @Inject(LOGGER) private readonly logger: Logger,
+    @Inject(DB) private readonly db: Db,
   ) {}
 
   @Post('stripe')
@@ -118,14 +158,25 @@ export class StripeWebhookController {
     try {
       event = await this.payments.parseWebhook(req.rawBody ?? Buffer.alloc(0), signature);
     } catch {
+      await this.failure('invalid_signature');
       throw new BadRequestException({ error: 'invalid_signature' });
     }
     try {
       await this.billing.handle(event);
     } catch (err) {
       this.logger.error({ eventId: event.eventId, err: String(err) }, 'billing event failed');
+      await this.failure('handler_error');
       throw new InternalServerErrorException(); // non-2xx makes Stripe retry
     }
     return { received: true };
+  }
+
+  /** AD-16: provider health counts webhook failures per day. */
+  private async failure(value: string) {
+    await this.db
+      .insertInto('provider_status_events')
+      .values({ provider: 'stripe', metric: 'webhook_failure', value })
+      .execute()
+      .catch(() => undefined);
   }
 }

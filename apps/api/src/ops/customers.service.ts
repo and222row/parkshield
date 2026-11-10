@@ -252,6 +252,7 @@ export class CustomersService {
       },
       protection,
       subscriptions: subs.map((s) => ({
+        id: s.id,
         plan: s.plan,
         status: s.status,
         contractNo: s.contract_no,
@@ -352,6 +353,103 @@ export class CustomersService {
         status: r.status,
         createdAt: r.created_at,
       })),
+    };
+  }
+
+  /**
+   * AD-20: the small summary next to a Zammad ticket (opened from the ticket's link field). Same
+   * masking and audit as Customer 360; the full view is one click away.
+   */
+  async summary(by: StaffContext, email: string) {
+    const u = await this.db
+      .selectFrom('users')
+      .select(['id', 'email', 'status', 'created_at'])
+      .where('email', '=', email.trim().toLowerCase())
+      .where('kind', '=', 'customer')
+      .executeTakeFirst();
+    await this.staff.auditRead(by.userId, 'customer.summary', 'users', u?.id ?? null, {
+      via: 'zammad',
+      found: Boolean(u),
+    });
+    if (!u) return { found: false as const };
+    const [sub, counts, protection] = await Promise.all([
+      this.db
+        .selectFrom('subscriptions')
+        .select(['plan', 'status', 'current_period_end', 'cancel_at_period_end'])
+        .where('user_id', '=', u.id)
+        .orderBy('created_at', 'desc')
+        .executeTakeFirst(),
+      this.db
+        .selectNoFrom((eb) => [
+          eb
+            .selectFrom('vehicles')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('owner_user_id', '=', u.id)
+            .as('vehicles'),
+          eb
+            .selectFrom('qr_tokens as t')
+            .innerJoin('vehicles as v', 'v.id', 't.vehicle_id')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('v.owner_user_id', '=', u.id)
+            .where('t.status', '=', 'active')
+            .as('activeDecals'),
+          eb
+            .selectFrom('push_subscriptions')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('user_id', '=', u.id)
+            .as('pushDevices'),
+          eb
+            .selectFrom('contact_channels')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('user_id', '=', u.id)
+            .where('type', '=', 'whatsapp')
+            .where('verified_at', 'is not', null)
+            .as('whatsapp'),
+          eb
+            .selectFrom('emergency_contacts')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('user_id', '=', u.id)
+            .where('consent', '=', 'confirmed')
+            .as('contacts'),
+          eb
+            .selectFrom('alerts as a')
+            .innerJoin('vehicles as v', 'v.id', 'a.vehicle_id')
+            .select((e) => e.fn.max('a.created_at').as('m'))
+            .where('v.owner_user_id', '=', u.id)
+            .where('a.is_test', '=', false)
+            .as('lastAlertAt'),
+          eb
+            .selectFrom('data_subject_requests')
+            .select((e) => e.fn.countAll<string>().as('n'))
+            .where('user_id', '=', u.id)
+            .where('status', 'not in', ['completed', 'rejected'])
+            .as('openDsr'),
+        ])
+        .executeTakeFirstOrThrow(),
+      this.preferences.protection(u.id),
+    ]);
+    return {
+      found: true as const,
+      id: u.id,
+      email: maskEmail(u.email),
+      status: u.status,
+      customerSince: u.created_at,
+      subscription: sub
+        ? {
+            plan: sub.plan,
+            status: sub.status,
+            periodEnd: sub.current_period_end,
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+          }
+        : null,
+      vehicles: Number(counts.vehicles ?? 0),
+      activeDecals: Number(counts.activeDecals ?? 0),
+      pushDevices: Number(counts.pushDevices ?? 0),
+      whatsapp: Number(counts.whatsapp ?? 0) > 0,
+      contacts: Number(counts.contacts ?? 0),
+      lastAlertAt: (counts.lastAlertAt as Date | null) ?? null,
+      openDsr: Number(counts.openDsr ?? 0),
+      protection: protection.percent,
     };
   }
 

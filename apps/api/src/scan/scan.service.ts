@@ -13,14 +13,10 @@ import { WordListsService } from '../moderation/word-lists.service';
 import { EscalationService } from '../notifications/escalation.service';
 import { ScannerRefService } from './scanner-ref.service';
 
-export const DISPATCH_TOPIC = 'alert.dispatch';
-const CROCKFORD_CODE = /^[0-9A-HJKMNP-TV-Z]{10}$/;
+import { normalizeCode } from '../vehicles/tokens.service';
 
-/** Crockford decoding is forgiving about look-alikes: O→0, I/L→1, case and hyphens ignored. */
-export function normalizeCode(raw: string): string | null {
-  const code = raw.toUpperCase().replace(/-/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
-  return CROCKFORD_CODE.test(code) ? code : null;
-}
+export { normalizeCode };
+export const DISPATCH_TOPIC = 'alert.dispatch';
 
 export const FOLLOWUP_TOPIC = 'alert.followup';
 
@@ -77,6 +73,21 @@ export class ScanService {
         )
         .executeTakeFirst()) ?? null
     );
+  }
+
+  /** AD-07: a pre-printed partner decal nobody has set up yet; the scanner page offers the set-up. */
+  async isUnclaimed(rawCode: string): Promise<boolean> {
+    const code = normalizeCode(rawCode);
+    if (!code) return false;
+    const t = await this.db
+      .selectFrom('qr_tokens')
+      .select('id')
+      .where('code_hash', '=', sha256(code))
+      .where('vehicle_id', 'is', null)
+      .where('batch_id', 'is not', null)
+      .where('status', 'in', ['generated', 'printed', 'shipped'])
+      .executeTakeFirst();
+    return Boolean(t);
   }
 
   /** Scanner page data (02-architecture §3 step 1). Never contains the owner's name, plate or number. */

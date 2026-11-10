@@ -38,6 +38,10 @@ const values = {
   ticket: 'ZM-1234',
   count: 2,
   first: new Date('2027-08-10T09:15:00Z'),
+  amount: '7,42 €',
+  creditNote: 'GS-2027-000001',
+  ended: 'yes',
+  list: 'whatsapp.quality: CRITICAL (RED)',
 };
 
 describe('mail templates', () => {

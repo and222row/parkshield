@@ -429,7 +429,16 @@ describe('run_retention() (US-33)', () => {
         { action: marker, entity: 'test', created_at: ago('11 months') },
       ])
       .execute();
+    // Only rows already copied to the locked bucket may go (US-42): mark everything as streamed.
+    const { cursor } = await h.db
+      .selectFrom('audit_stream_state')
+      .select((eb) => eb.ref('last_id').as('cursor'))
+      .executeTakeFirstOrThrow();
+    await sql`UPDATE audit_stream_state SET last_id = (SELECT max(id) FROM audit_logs)`.execute(
+      h.db,
+    );
     await run();
+    await sql`UPDATE audit_stream_state SET last_id = ${cursor}`.execute(h.db);
     const rows = await h.db
       .selectFrom('audit_logs')
       .select('created_at')

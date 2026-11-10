@@ -179,7 +179,12 @@ export class BillingService {
     if (input.promoCode) {
       promo = await this.findPromo(input.promoCode, input.plan);
       if (!promo) throw new BadRequestException({ error: 'promo_invalid' });
-      if (!fakeProviders(this.env).payments && !promo.stripe_coupon_id) {
+      // Extra months are applied after the payment (AD-13); every other kind needs its Stripe coupon.
+      if (
+        !fakeProviders(this.env).payments &&
+        promo.kind !== 'extra_months' &&
+        !promo.stripe_coupon_id
+      ) {
         throw new BadRequestException({ error: 'promo_invalid' });
       }
     }
@@ -257,13 +262,20 @@ export class BillingService {
     const promo = promoCodeId
       ? await this.db
           .selectFrom('promo_codes')
-          .select('price_lock_months')
+          .select(['price_lock_months', 'kind', 'value'])
           .where('id', '=', promoCodeId)
           .executeTakeFirst()
       : undefined;
     const priceLockedUntil = promo?.price_lock_months
       ? new Date(e.periodStart.getTime() + promo.price_lock_months * 30.44 * 86_400_000)
       : null;
+    // AD-13 "extra months": the paid year is followed by free months before the first renewal.
+    let periodEnd = e.periodEnd;
+    if (promo?.kind === 'extra_months') {
+      periodEnd = new Date(e.periodEnd);
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + promo.value);
+      await this.payments.extendPeriod(e.subscriptionId, periodEnd);
+    }
 
     const contractNo = `PS-${randomCrockford(8)}`;
     const inserted = await this.db
@@ -277,7 +289,7 @@ export class BillingService {
         price_locked_until: priceLockedUntil,
         withdrawal_waiver_at: e.metadata.waiverAt ? new Date(e.metadata.waiverAt) : null,
         current_period_start: e.periodStart,
-        current_period_end: e.periodEnd,
+        current_period_end: periodEnd,
         contract_no: contractNo,
       })
       .onConflict((oc) => oc.column('stripe_subscription_id').doNothing())
@@ -300,7 +312,7 @@ export class BillingService {
       to: user.email,
       template: 'subscription_started',
       locale: user.preferred_lang,
-      values: { plan: PLAN_NAMES[plan], periodEnd: e.periodEnd, contractNo },
+      values: { plan: PLAN_NAMES[plan], periodEnd, contractNo },
       actionUrl: `${this.env.WEB_BASE_URL}/konto`,
     });
   }

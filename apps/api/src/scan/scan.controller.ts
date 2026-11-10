@@ -56,7 +56,9 @@ export class ScanController {
 
   @Get('scan/:code')
   async page(@Param('code') code: string, @Req() req: FastifyRequest) {
-    return this.scan.pageData(await this.resolve(code, req));
+    const token = await this.scan.lookup(code);
+    if (!token && (await this.scan.isUnclaimed(code))) return { unclaimed: true };
+    return this.scan.pageData(token ?? (await this.resolve(code, req)));
   }
 
   @Post('scan/:code/alerts')

@@ -27,6 +27,7 @@ export interface Harness {
 
 /** Public app against parkshield_test + Valkey DB 1, with every provider faked. */
 export const PRINT_DIR = join(tmpdir(), `ps-print-${process.pid}`);
+export const AUDIT_DIR = join(tmpdir(), `ps-audit-${process.pid}`);
 export const TEST_WA_WEBHOOK_SECRET = 'test-whatsapp-webhook-secret';
 
 // Original values of settings changed by setSetting (undefined = key did not exist).
@@ -104,6 +105,9 @@ export async function createHarness(): Promise<Harness> {
     PRINT_OUTBOX_DIR: PRINT_DIR,
     D360_API_KEY: '',
     D360_WEBHOOK_SECRET: TEST_WA_WEBHOOK_SECRET,
+    AUDIT_BUCKET: '',
+    AUDIT_BUCKET_DIR: AUDIT_DIR,
+    ZAMMAD_TOKEN: '',
   });
   const app = await buildPublicApp(env, createLogger(env));
   await app.init();

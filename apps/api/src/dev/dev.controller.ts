@@ -23,7 +23,9 @@ import type { FakePayments, FakeSession } from '../providers/fake-payments';
 import { DEV_MAILBOX_KEY } from '../providers/mailer';
 import { simplePdf } from '../providers/pdf';
 import { PAYMENTS } from '../providers/ports';
+import { DEV_TICKETS_KEY } from '../providers/support-desk';
 import { DEV_WHATSAPP_KEY } from '../providers/whatsapp';
+import { TokensService } from '../vehicles/tokens.service';
 
 export const DEV_PUSH_KEY = 'dev:push';
 
@@ -42,6 +44,7 @@ export class DevController {
     @Inject(PAYMENTS) private readonly payments: FakePayments,
     @Inject(BillingService) private readonly billing: BillingService,
     @Inject(OrdersService) private readonly orders: OrdersService,
+    @Inject(TokensService) private readonly tokens: TokensService,
     @Inject(DB) private readonly db: Db,
   ) {}
 
@@ -55,6 +58,26 @@ export class DevController {
   async whatsappInbox() {
     const rows = await this.valkey.lrange(DEV_WHATSAPP_KEY, 0, 49);
     return { messages: rows.map((r) => JSON.parse(r) as unknown) };
+  }
+
+  /** Tickets the contact form created while Zammad is faked (US-44). */
+  @Get('zammad/tickets')
+  async tickets() {
+    const rows = await this.valkey.lrange(DEV_TICKETS_KEY, 0, 49);
+    return { tickets: rows.map((r) => JSON.parse(r) as unknown) };
+  }
+
+  /** Stands in for reading the printed batch decals (US-39): the unclaimed codes of a batch. */
+  @Get('batches/:id/codes')
+  async batchCodes(@Param('id', ParseUUIDPipe) id: string) {
+    const rows = await this.db
+      .selectFrom('qr_tokens')
+      .select('code_enc')
+      .where('batch_id', '=', id)
+      .where('vehicle_id', 'is', null)
+      .orderBy('created_at')
+      .execute();
+    return { codes: rows.map((r) => this.tokens.decrypt(r.code_enc)) };
   }
 
   /**

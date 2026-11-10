@@ -21,7 +21,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { PageShell } from '@/components/site-chrome';
 import { api, errorText } from '@/lib/api-client';
-import type { InvoiceSummary, Me, Protection, SubscriptionSummary } from '@/lib/api-server';
+import type {
+  CreditNote,
+  InvoiceSummary,
+  Me,
+  Protection,
+  SubscriptionSummary,
+} from '@/lib/api-server';
+import { usePendingClaim } from '@/lib/pending-claim';
 import { useBrowserValue } from '@/lib/use-browser-value';
 
 const PLAN_LABEL = { plus: 'Plus', premium: 'Premium' } as const;
@@ -36,7 +43,9 @@ export function AccountView({
   protection,
   firstVehicleId,
   checkout,
+  creditNotes = [],
 }: {
+  creditNotes?: CreditNote[];
   contactCount: number;
   protection: Protection | null;
   firstVehicleId: string | null;
@@ -50,6 +59,7 @@ export function AccountView({
   const { t, locale } = useI18n();
   const router = useRouter();
   const shownLocale = useRef(locale);
+  const pending = usePendingClaim();
 
   // When the person switches language here, e-mails follow (only on an actual switch, not on first render).
   useEffect(() => {
@@ -100,6 +110,16 @@ export function AccountView({
 
           {checkout === 'success' && !subscription && (
             <Notice tone="info">{t('account.checkoutSuccess')}</Notice>
+          )}
+          {pending && (
+            <Notice tone="info" title={t('claim.pendingTitle')}>
+              {subscription ? t('claim.pendingReady') : t('claim.pendingPay')}{' '}
+              {subscription && (
+                <Link href="/aktivieren" className="font-semibold underline">
+                  {t('claim.pendingLink')}
+                </Link>
+              )}
+            </Notice>
           )}
           {checkout === 'canceled' && (
             <Notice tone="warning">{t('account.checkoutCanceled')}</Notice>
@@ -180,6 +200,11 @@ export function AccountView({
                     {t('privacy.manage')}
                   </Link>
                 </li>
+                <li>
+                  <Link href="/hilfe" className="text-primary underline">
+                    {t('help.accountLink')}
+                  </Link>
+                </li>
               </ul>
             </Stack>
           </Card>
@@ -230,6 +255,32 @@ export function AccountView({
                     </li>
                   ))}
                 </ul>
+              )}
+              {creditNotes.length > 0 && (
+                <>
+                  <Heading level={3} className="text-base">
+                    {t('account.creditNotes')}
+                  </Heading>
+                  <ul className="flex flex-col gap-2" aria-label={t('account.creditNotes')}>
+                    {creditNotes.map((c) => (
+                      <li key={c.id}>
+                        <a
+                          className="text-primary underline"
+                          href={`/v1/billing/credit-notes/${c.id}/pdf`}
+                        >
+                          {t('account.creditNoteLink', {
+                            number: c.number,
+                            date: new Date(c.createdAt),
+                            amount: new Intl.NumberFormat(locale === 'en' ? 'en-IE' : 'de-DE', {
+                              style: 'currency',
+                              currency: 'EUR',
+                            }).format(c.amountCents / 100),
+                          })}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </Stack>
           </Card>
@@ -418,7 +469,10 @@ function SubscriptionInfo({ sub }: { sub: SubscriptionSummary }) {
 
 function CheckoutForm() {
   const { t } = useI18n();
-  const [promo, setPromo] = useState('');
+  const pending = usePendingClaim();
+  const [typed, setPromo] = useState<string | null>(null);
+  // A partner decal brings its promo code along (AD-07); the person may still change it.
+  const promo = typed ?? pending?.promoCode ?? '';
   const [immediate, setImmediate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

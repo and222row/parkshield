@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import {
   serverApi,
   type ChannelsOverview,
+  type CreditNote,
   type EmergencyContactList,
   type InvoiceSummary,
   type Me,
@@ -21,13 +22,14 @@ export default async function AccountPage({
 }) {
   const me = await serverApi<Me>('/v1/me');
   if (me.status === 401 || !me.data) redirect('/anmelden');
-  const [sub, invoices, vehicles, channels, contacts, protection] = await Promise.all([
+  const [sub, invoices, vehicles, channels, contacts, protection, credit] = await Promise.all([
     serverApi<{ subscription: SubscriptionSummary | null }>('/v1/billing/subscription'),
     serverApi<{ invoices: InvoiceSummary[] }>('/v1/billing/invoices'),
     serverApi<{ vehicles: Vehicle[] }>('/v1/vehicles'),
     serverApi<ChannelsOverview>('/v1/channels'),
     serverApi<EmergencyContactList>('/v1/emergency-contacts'),
     serverApi<Protection>('/v1/me/protection'),
+    serverApi<{ creditNotes: CreditNote[] }>('/v1/billing/credit-notes'),
   ]);
   const { checkout } = await searchParams;
   return (
@@ -35,6 +37,7 @@ export default async function AccountPage({
       me={me.data}
       subscription={sub.data?.subscription ?? null}
       invoices={invoices.data?.invoices ?? []}
+      creditNotes={credit.data?.creditNotes ?? []}
       vehicleCount={vehicles.data?.vehicles.length ?? 0}
       channels={{
         push: channels.data?.push.devices.length ?? 0,

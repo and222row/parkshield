@@ -4,6 +4,7 @@ import {
   renderInactive,
   renderRateLimited,
   renderScanner,
+  renderUnclaimed,
   scannerCsp,
   type ScanPageData,
 } from '@/lib/scanner/render';
@@ -31,9 +32,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
       headers,
       cache: 'no-store',
     });
-    if (res.ok) {
+    const data = res.ok ? ((await res.json()) as ScanPageData | { unclaimed: true }) : null;
+    if (data && 'unclaimed' in data) {
       status = 200;
-      const data = (await res.json()) as ScanPageData;
+      html = renderUnclaimed(locale, code.toUpperCase());
+    } else if (data) {
+      status = 200;
       html = renderScanner(
         locale,
         code.toUpperCase(),

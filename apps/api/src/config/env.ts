@@ -40,6 +40,17 @@ export const envSchema = z.object({
   D360_WEBHOOK_SECRET: z.string().default(''),
   PRINT_PARTNER: z.string().default(''),
   PRINT_OUTBOX_DIR: z.string().default(''),
+  // AD-17: Object Lock bucket for the audit stream (empty: local folder .local/audit-bucket).
+  AUDIT_BUCKET: z.string().default(''),
+  AUDIT_BUCKET_DIR: z.string().default(''),
+  S3_ENDPOINT: z.string().default(''),
+  S3_REGION: z.string().default('fsn1'),
+  S3_ACCESS_KEY: z.string().default(''),
+  S3_SECRET_KEY: z.string().default(''),
+  // AD-20: Zammad (empty token: tickets go to the dev inbox).
+  ZAMMAD_URL: z.string().default(''),
+  ZAMMAD_TOKEN: z.string().default(''),
+  ZAMMAD_GROUP: z.string().default('Support'),
 });
 
 /** Providers without keys fall back to local fakes, which are never allowed in production. */
@@ -51,6 +62,8 @@ export function fakeProviders(env: Env) {
     whatsapp: !env.D360_API_KEY,
     // No real print partner adapter yet: it is built once the partner is chosen in Phase 0.
     print: !env.PRINT_PARTNER,
+    auditBucket: !env.AUDIT_BUCKET,
+    support: !env.ZAMMAD_TOKEN,
   };
 }
 export type Env = z.infer<typeof envSchema>;

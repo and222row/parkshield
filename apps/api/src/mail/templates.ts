@@ -254,6 +254,27 @@ const templates = {
       ],
       action: 'Ersatzaufkleber bestellen',
     },
+    decal_returned: {
+      subject: 'Ihr Aufkleber für „{nickname}“ kam zurück',
+      lines: [
+        'Die Sendung mit Ihrem Aufkleber für „{nickname}“ wurde nicht zugestellt und kam zu uns zurück.',
+        'Bitte schreiben Sie uns kurz, an welche Adresse wir ihn noch einmal schicken sollen. Der neue Versand ist für Sie kostenlos. Bis dahin können Sie den Aufkleber im Konto als PDF ausdrucken.',
+      ],
+      action: 'Support kontaktieren',
+    },
+    refund_issued: {
+      subject: 'Wir haben Ihnen {amount} erstattet',
+      lines: [
+        'Wir haben Ihnen {amount} erstattet (Gutschrift {creditNote}). Das Geld ist meist nach 5 bis 10 Werktagen auf Ihrem Konto.',
+        '{ended, select, yes {Ihr Abo ist damit beendet, Ihre Aufkleber sind ab sofort inaktiv.} other {An Ihrem Abo ändert sich dadurch nichts.}} Die Gutschrift finden Sie in Ihrem Konto.',
+      ],
+      action: 'Zum Konto',
+    },
+    provider_health_alert: {
+      subject: 'Anbieter-Status: {count, plural, one {eine Änderung} other {# Änderungen}}',
+      lines: ['{list}', 'Details und Kill Switches stehen in der Ops-App unter „Anbieter“.'],
+      action: 'Anbieter-Status öffnen',
+    },
   },
   en: {
     magic_link: {
@@ -497,6 +518,27 @@ const templates = {
         'The replacement decal is free for you. Order it in your account; until it arrives you can print it as a PDF.',
       ],
       action: 'Order replacement decal',
+    },
+    decal_returned: {
+      subject: 'Your decal for “{nickname}” came back',
+      lines: [
+        'The parcel with your decal for “{nickname}” could not be delivered and came back to us.',
+        'Please tell us briefly where we should send it again. The new shipment is free for you. Until then you can print the decal as a PDF in your account.',
+      ],
+      action: 'Contact support',
+    },
+    refund_issued: {
+      subject: 'We refunded {amount}',
+      lines: [
+        'We refunded {amount} to you (credit note {creditNote}). The money usually arrives within 5 to 10 working days.',
+        '{ended, select, yes {Your subscription has ended, your decals are inactive from now on.} other {Your subscription stays as it is.}} You will find the credit note in your account.',
+      ],
+      action: 'Go to account',
+    },
+    provider_health_alert: {
+      subject: 'Provider status: {count, plural, one {one change} other {# changes}}',
+      lines: ['{list}', 'Details and kill switches are in the ops app under “Providers”.'],
+      action: 'Open provider status',
     },
   },
 } satisfies Record<MailLocale, Record<string, TemplateSource>>;

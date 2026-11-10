@@ -189,3 +189,12 @@ export interface InvoiceSummary {
   totalCents: number;
   pdfUrl: string | null;
 }
+
+/** US-40: credit note (Gutschrift) for a refund. */
+export interface CreditNote {
+  id: string;
+  number: string;
+  kind: string;
+  amountCents: number;
+  createdAt: string;
+}

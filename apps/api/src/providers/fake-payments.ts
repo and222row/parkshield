@@ -2,7 +2,9 @@ import type { Redis } from 'ioredis';
 import { randomToken } from '../core/crypto';
 import type {
   BillingEvent,
+  Charge,
   CheckoutRequest,
+  CouponInput,
   Invoice,
   PaymentCheckoutRequest,
   Payments,
@@ -70,24 +72,66 @@ export class FakePayments implements Payments {
     };
     await this.valkey.lpush(key('invoices', session.customerId), JSON.stringify(invoice));
     const eventId = `evt_fake_${randomToken(9)}`;
+    const paymentIntentId = `pi_fake_${randomToken(9)}`;
+    await this.valkey.set(key('charge', paymentIntentId), String(amountCents));
     if (session.kind === 'payment') {
-      return {
-        kind: 'payment_completed',
-        eventId,
-        paymentIntentId: `pi_fake_${randomToken(9)}`,
-        metadata: session.metadata,
-      };
+      return { kind: 'payment_completed', eventId, paymentIntentId, metadata: session.metadata };
     }
+    const subscriptionId = `sub_fake_${randomToken(9)}`;
+    await this.valkey.set(key('subscription-charge', subscriptionId), paymentIntentId);
     return {
       kind: 'checkout_completed',
       eventId,
       customerId: session.customerId,
-      subscriptionId: `sub_fake_${randomToken(9)}`,
+      subscriptionId,
       metadata: session.metadata,
       periodStart: now,
       periodEnd: new Date(now.getTime() + 365 * DAY),
     };
   }
+
+  async findCharge(
+    ref: { subscriptionId: string } | { paymentIntentId: string },
+  ): Promise<Charge | null> {
+    const pi =
+      'paymentIntentId' in ref
+        ? ref.paymentIntentId
+        : await this.valkey.get(key('subscription-charge', ref.subscriptionId));
+    if (!pi) return null;
+    const amount = await this.valkey.get(key('charge', pi));
+    if (amount === null) return null;
+    const refunded = await this.valkey.get(key('refunded', pi));
+    return {
+      paymentIntentId: pi,
+      amountCents: Number(amount),
+      refundedCents: Number(refunded ?? 0),
+    };
+  }
+
+  /** Same rule as Stripe: never more than what is left of the charge. */
+  async refund(input: { paymentIntentId: string; amountCents: number }) {
+    const charge = await this.findCharge({ paymentIntentId: input.paymentIntentId });
+    if (!charge) throw new Error('No such payment_intent');
+    const after = await this.valkey.incrby(
+      key('refunded', input.paymentIntentId),
+      input.amountCents,
+    );
+    if (after > charge.amountCents) {
+      await this.valkey.decrby(key('refunded', input.paymentIntentId), input.amountCents);
+      throw new Error('Refund amount is greater than the unrefunded amount of the charge');
+    }
+    return { refundId: `re_fake_${randomToken(9)}` };
+  }
+
+  async cancelNow(): Promise<void> {}
+
+  async extendPeriod(): Promise<void> {}
+
+  async createCoupon(input: CouponInput): Promise<{ couponId: string }> {
+    return { couponId: `coupon_fake_${input.code.toLowerCase()}` };
+  }
+
+  async deleteCoupon(): Promise<void> {}
 
   async portalUrl(_customerId: string, returnUrl: string): Promise<string> {
     return `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}portal=dev`;
