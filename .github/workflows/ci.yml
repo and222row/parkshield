@@ -110,7 +110,14 @@ jobs:
         with:
           scan-args: --lockfile=package-lock.json
       - name: Semgrep
-        run: pipx run semgrep scan --config p/typescript --config p/secrets --error --metrics=off
+        run: >-
+          pipx run semgrep scan --config p/typescript --config p/nodejsscan --config p/react
+          --config p/owasp-top-ten --config p/secrets --error --metrics=off
+      - name: security.txt has not expired (RFC 9116)
+        run: |
+          expires=$(grep -oP '^Expires: \K.*' apps/web/public/.well-known/security.txt)
+          test "$(date -d "$expires" +%s)" -gt "$(date -d '+30 days' +%s)" || {
+            echo "::error::security.txt expires on $expires; renew it"; exit 1; }
 
   infra:
     name: Terraform + Ansible checks

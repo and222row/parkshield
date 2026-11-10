@@ -30,6 +30,7 @@ test('quiet hours mute normal alerts; urgent ones still come through (US-26)', a
   const email = uniqueEmail('quiet');
   const url = await ownerWithActiveDecal(page, request, email);
   await page.goto('/konto/benachrichtigungen');
+  await page.waitForLoadState('networkidle'); // typing before hydration would be reset to the defaults
   await expect(page.getByText('Keine Ruhezeiten eingerichtet.')).toBeVisible();
   await page.getByLabel('Von').fill('00:00');
   await page.getByLabel('Bis').fill('00:00');

@@ -13,7 +13,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { StaffPasskeyService } from '../auth/passkey.service';
 import type { Env } from '../config/env';
-import { deviceLabel } from '../core/ip';
+import { deviceLabel, truncateIp } from '../core/ip';
+import { RateLimitService } from '../core/rate-limit.service';
 import { ENV } from '../core/tokens';
 import { ZodPipe } from '../core/zod.pipe';
 import { OPS_CSRF_COOKIE, OPS_SESSION_COOKIE, OpsPublic, StaffOnly } from './access';
@@ -37,7 +38,13 @@ export class OpsAuthController {
     @Inject(StaffService) private readonly staff: StaffService,
     @Inject(StaffPasskeyService) private readonly passkeys: StaffPasskeyService,
     @Inject(ENV) private readonly env: Env,
+    @Inject(RateLimitService) private readonly limits: RateLimitService,
   ) {}
+
+  /** ASVS 2.2.1: sign-in and invitation endpoints are limited per peer address. */
+  private limit(req: FastifyRequest) {
+    return this.limits.enforce('ops_auth.ip', truncateIp(req.ip));
+  }
 
   private setCookies(reply: FastifyReply, s: { token: string; csrf: string }) {
     // Host-only cookies on the ops domain, Strict: ops links are never followed from e-mails.
@@ -53,7 +60,8 @@ export class OpsAuthController {
   @Post('auth/login/options')
   @HttpCode(200)
   @OpsPublic()
-  loginOptions() {
+  async loginOptions(@Req() req: FastifyRequest) {
+    await this.limit(req);
     return this.passkeys.loginOptions();
   }
 
@@ -65,6 +73,7 @@ export class OpsAuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    await this.limit(req);
     const userId = await this.passkeys.login(body.challengeId, body.response as never);
     if (!userId) throw new UnauthorizedException({ error: 'passkey_invalid' });
     this.setCookies(
@@ -77,7 +86,11 @@ export class OpsAuthController {
   @Post('auth/invite/view')
   @HttpCode(200)
   @OpsPublic()
-  async inviteView(@Body(new ZodPipe(Token)) body: z.infer<typeof Token>) {
+  async inviteView(
+    @Body(new ZodPipe(Token)) body: z.infer<typeof Token>,
+    @Req() req: FastifyRequest,
+  ) {
+    await this.limit(req);
     const t = await this.staff.inviteTarget(body.token);
     return { email: t.email, name: t.name };
   }
@@ -85,7 +98,11 @@ export class OpsAuthController {
   @Post('auth/invite/options')
   @HttpCode(200)
   @OpsPublic()
-  async inviteOptions(@Body(new ZodPipe(Token)) body: z.infer<typeof Token>) {
+  async inviteOptions(
+    @Body(new ZodPipe(Token)) body: z.infer<typeof Token>,
+    @Req() req: FastifyRequest,
+  ) {
+    await this.limit(req);
     const t = await this.staff.inviteTarget(body.token);
     return this.passkeys.registrationOptions({ userId: t.userId, email: t.email });
   }
@@ -98,6 +115,7 @@ export class OpsAuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    await this.limit(req);
     const t = await this.staff.inviteTarget(body.token);
     await this.passkeys.register(t.userId, body.response as never, body.label);
     await this.staff.consumeInvite(body.token);

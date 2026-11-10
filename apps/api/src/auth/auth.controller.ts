@@ -20,6 +20,7 @@ import { z } from 'zod';
 import type { Env } from '../config/env';
 import type { Db } from '../core/core.module';
 import { deviceLabel, truncateIp } from '../core/ip';
+import { RateLimitService } from '../core/rate-limit.service';
 import { DB, ENV } from '../core/tokens';
 import { ZodPipe } from '../core/zod.pipe';
 import { AuthService } from './auth.service';
@@ -71,6 +72,7 @@ export class AuthController {
     @Inject(PasskeyService) private readonly passkeys: PasskeyService,
     @Inject(DB) private readonly db: Db,
     @Inject(ENV) private readonly env: Env,
+    @Inject(RateLimitService) private readonly limits: RateLimitService,
   ) {}
 
   private get secureCookies() {
@@ -94,6 +96,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    await this.limits.enforce('auth.ip', truncateIp(req.ip));
     const session = await this.auth.consumeMagicLink(
       body.token,
       deviceLabel(req.headers['user-agent']),
@@ -132,7 +135,8 @@ export class AuthController {
 
   @Post('auth/passkey/login/options')
   @HttpCode(200)
-  loginOptions() {
+  async loginOptions(@Req() req: FastifyRequest) {
+    await this.limits.enforce('auth.ip', truncateIp(req.ip));
     return this.passkeys.loginOptions();
   }
 
@@ -143,6 +147,7 @@ export class AuthController {
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
+    await this.limits.enforce('auth.ip', truncateIp(req.ip));
     const userId = await this.passkeys.login(body.challengeId, body.response as never);
     if (!userId) throw new UnauthorizedException({ error: 'passkey_invalid' });
     const session = await this.auth.signIn(userId, deviceLabel(req.headers['user-agent']));

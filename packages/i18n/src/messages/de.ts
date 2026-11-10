@@ -21,6 +21,7 @@ const de = {
       terms: 'AGB',
       withdrawal: 'Widerruf',
       accessibility: 'Barrierefreiheit',
+      security: 'Sicherheitslücke melden',
       cancelContract: 'Verträge hier kündigen',
     },
   },

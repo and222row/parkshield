@@ -49,6 +49,7 @@ export function SiteFooter() {
     ['/agb', t('common.footer.terms')],
     ['/widerruf', t('common.footer.withdrawal')],
     ['/barrierefreiheit', t('common.footer.accessibility')],
+    ['/sicherheit', t('common.footer.security')],
   ];
   return (
     <footer className="mt-16 border-t border-border bg-surface">

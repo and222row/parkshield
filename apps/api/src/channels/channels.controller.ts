@@ -13,6 +13,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CurrentUser, SessionGuard, SkipCsrf } from '../auth/guards';
@@ -119,7 +120,15 @@ export class WhatsAppWebhookController {
   @Post('whatsapp/:secret')
   @HttpCode(200)
   async receive(@Param('secret') secret: string, @Body() body: unknown) {
-    if (!this.env.D360_WEBHOOK_SECRET || secret !== this.env.D360_WEBHOOK_SECRET)
+    // Constant-time comparison of SHA-256 digests (equal length, no timing leak; ASVS 6.2.x).
+    const expected = this.env.D360_WEBHOOK_SECRET;
+    if (
+      !expected ||
+      !timingSafeEqual(
+        createHash('sha256').update(secret).digest(),
+        createHash('sha256').update(expected).digest(),
+      )
+    )
       throw new NotFoundException();
     await this.webhook.handle(body);
     return { received: true };

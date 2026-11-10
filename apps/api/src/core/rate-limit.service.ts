@@ -56,6 +56,10 @@ export const RATE_LIMITS = {
   // US-44: the contact form creates Zammad tickets.
   'support.ip': { max: 10, windowSeconds: 3600 },
   'support.email': { max: 5, windowSeconds: 3600 },
+  // ASVS 2.2.1: completing a sign-in (link, passkey) is limited per network even though the
+  // tokens are unguessable; a shared NAT (office, campus) still has plenty of room.
+  'auth.ip': { max: 60, windowSeconds: 600 },
+  'ops_auth.ip': { max: 30, windowSeconds: 600 },
 } as const;
 export type RateLimitName = keyof typeof RATE_LIMITS;
 

@@ -22,6 +22,7 @@ const en: typeof de = {
       terms: 'Terms',
       withdrawal: 'Withdrawal',
       accessibility: 'Accessibility',
+      security: 'Report a security issue',
       cancelContract: 'Cancel contract here',
     },
   },

@@ -2,7 +2,9 @@ import type { Locale } from '@parkshield/i18n';
 
 // Drafts derived from docs/04-legal-privacy.md. Placeholders in [brackets] are filled in Phase 0;
 // the final wording comes from the IT-law firm and the DPO. German is the binding version.
-export type LegalSlug = 'impressum' | 'datenschutz' | 'agb' | 'widerruf' | 'barrierefreiheit';
+export type LegalSlug =
+  'impressum' | 'datenschutz' | 'agb' | 'widerruf' | 'barrierefreiheit' | 'sicherheit';
+const SECURITY = 'security@parkshield.de';
 
 export interface LegalDoc {
   title: string;
@@ -165,6 +167,26 @@ const de: Record<LegalSlug, LegalDoc> = {
       },
     ],
   },
+  sicherheit: {
+    title: 'Sicherheitslücken melden',
+    sections: [
+      {
+        heading: 'So melden Sie eine Lücke',
+        paragraphs: [
+          `Haben Sie eine Sicherheitslücke in ParkShield gefunden? Schreiben Sie uns an ${SECURITY}. Beschreiben Sie bitte, wie wir das Problem nachvollziehen können. Wir bestätigen den Eingang innerhalb von 3 Werktagen und halten Sie über die Behebung auf dem Laufenden.`,
+          'Wir verzichten auf rechtliche Schritte gegen Personen, die eine Lücke in gutem Glauben und nach diesen Regeln melden.',
+        ],
+      },
+      {
+        heading: 'Regeln',
+        paragraphs: [
+          'Greifen Sie nur auf Ihre eigenen Konten und Daten zu. Laden Sie keine fremden Daten herunter, verändern oder löschen Sie nichts, und brechen Sie den Test ab, sobald Sie fremde Daten sehen.',
+          'Keine Tests, die den Dienst stören (Last, Spam, Massen-Scans von Aufklebern), kein Social Engineering, keine Angriffe auf unsere Dienstleister oder Mitarbeitenden.',
+          'Veröffentlichen Sie die Lücke erst, wenn wir sie behoben haben oder 90 Tage vergangen sind.',
+        ],
+      },
+    ],
+  },
   barrierefreiheit: {
     title: 'Erklärung zur Barrierefreiheit',
     sections: [
@@ -252,6 +274,26 @@ const en: Record<LegalSlug, LegalDoc> = {
         heading: 'Right of withdrawal',
         paragraphs: [
           `You may withdraw from this contract within fourteen days without giving reasons by sending a clear statement to ${CONTACT}. If you asked for the service to start immediately, you pay a proportionate amount for the service provided until withdrawal. A custom-printed decal cannot be returned.`,
+        ],
+      },
+    ],
+  },
+  sicherheit: {
+    title: 'Reporting security issues',
+    sections: [
+      {
+        heading: 'How to report',
+        paragraphs: [
+          `Found a security issue in ParkShield? Write to ${SECURITY} and describe how we can reproduce it. We confirm receipt within 3 working days and keep you informed about the fix.`,
+          'We will not take legal action against anyone who reports an issue in good faith and follows these rules.',
+        ],
+      },
+      {
+        heading: 'Rules',
+        paragraphs: [
+          'Only access your own accounts and data. Do not download, change or delete anyone else’s data, and stop as soon as you see data that is not yours.',
+          'No tests that disrupt the service (load, spam, mass scanning of decals), no social engineering, no attacks on our providers or staff.',
+          'Please do not publish the issue before we have fixed it or 90 days have passed.',
         ],
       },
     ],

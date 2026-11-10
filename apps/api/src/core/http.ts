@@ -22,6 +22,22 @@ export async function createHttpApp(
     rawBody: true, // Stripe webhook signatures are computed over the raw body
   });
   await app.register(fastifyCookie as never);
+  // ASVS 14.4: every API response, including errors. Caddy serves /v1 straight from here and adds HSTS.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onSend', async (_req, reply, payload) => {
+      reply.header('x-content-type-options', 'nosniff');
+      reply.header('x-frame-options', 'DENY');
+      reply.header('referrer-policy', 'no-referrer');
+      reply.header('cross-origin-resource-policy', 'same-origin');
+      // Not on PDFs: a 'none' policy stops the browser's built-in PDF viewer.
+      if (!String(reply.getHeader('content-type') ?? '').startsWith('application/pdf'))
+        reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+      // Account data must never sit in a shared or browser cache.
+      if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
+      return payload;
+    });
   // Encrypted Web Push bodies (aes128gcm) for the local push receiver in DevController.
   app
     .getHttpAdapter()

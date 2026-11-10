@@ -215,6 +215,7 @@ test('ops: invitation, passkey set-up, permissions and sign-in again (US-34)', a
 
   await page.getByRole('button', { name: 'Abmelden' }).click();
   await expect(page).toHaveURL(/\/anmelden$/);
+  await page.waitForLoadState('networkidle'); // a click before hydration does nothing
   await page.getByRole('button', { name: 'Mit Passkey anmelden' }).click();
   // Ceremony plus a full page load: slower than the default 5 s while the whole suite runs in parallel.
   await expect(page.getByRole('heading', { level: 1, name: 'Anna Admin' })).toBeVisible({

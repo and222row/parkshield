@@ -27,6 +27,9 @@ export default async function globalSetup() {
     'alert.scanner_global',
     'alert.vehicle',
     'report.fake_ip',
+    'support.ip',
+    'auth.ip',
+    'ops_auth.ip',
   ]) {
     await db.query(
       `INSERT INTO app_settings (key, value) VALUES ($1, $2)
