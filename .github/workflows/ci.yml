@@ -106,7 +106,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=high
-      - uses: google/osv-scanner-action/osv-scanner-action@v2
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.7.0
         with:
           scan-args: --lockfile=package-lock.json
       - name: Semgrep
@@ -132,7 +132,13 @@ jobs:
       - run: terraform -chdir=infra/monitoring fmt -check -recursive
       - run: terraform -chdir=infra/monitoring init -backend=false
       - run: terraform -chdir=infra/monitoring validate
-      - run: pipx run --spec ansible-lint ansible-lint infra/ansible
+      # ansible-lint resolves modules from installed collections (community.docker, ansible.posix, …).
+      - run: pipx install --include-deps ansible-lint
+      - name: ansible-lint
+        working-directory: infra/ansible
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          ansible-lint
 
   deploy-staging:
     name: Deploy to staging
