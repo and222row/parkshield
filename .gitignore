@@ -35,3 +35,5 @@ infra/monitoring/*.tfvars
 
 .vercel
 .env*
+# Ansible collections installed by CI for ansible-lint
+infra/ansible/collections/

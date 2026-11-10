@@ -5,7 +5,7 @@ import { sql } from 'kysely';
 // "max" metadata: the default set cannot tell mobile from landline numbers.
 import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 import type { AuthContext } from '../auth/session.service';
-import type { Env } from '../config/env';
+import { isTestEnvironment, type Env } from '../config/env';
 import type { Db } from '../core/core.module';
 import type { FieldCrypto } from '../core/crypto';
 import { sha256 } from '../core/crypto';
@@ -109,7 +109,7 @@ export class ChannelsService {
     input: { endpoint: string; p256dh: string; auth: string; label?: string },
     userAgent: string | undefined,
   ) {
-    if (!allowedPushEndpoint(input.endpoint, this.env.NODE_ENV !== 'production')) {
+    if (!allowedPushEndpoint(input.endpoint, isTestEnvironment(this.env))) {
       throw new BadRequestException({ error: 'push_endpoint_not_allowed' });
     }
     // An endpoint belongs to one browser profile; if it was registered by someone else, it moves.

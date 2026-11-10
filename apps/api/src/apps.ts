@@ -45,7 +45,7 @@ import { PrivacyService } from './privacy/privacy.service';
 import { SessionService } from './auth/session.service';
 import { BillingController, StripeWebhookController } from './billing/billing.controller';
 import { BillingService } from './billing/billing.service';
-import { fakeProviders, type Env } from './config/env';
+import { fakeProviders, isTestEnvironment, type Env } from './config/env';
 import { CoreModule } from './core/core.module';
 import { GeoService } from './core/geo.service';
 import { createHttpApp } from './core/http';
@@ -133,7 +133,7 @@ const opsProviders = [
 export class PublicAppModule {
   static forRoot(env: Env, logger: Logger): DynamicModule {
     const fakes = Object.values(fakeProviders(env)).some(Boolean);
-    const devRoutes = fakes && env.NODE_ENV !== 'production';
+    const devRoutes = fakes && isTestEnvironment(env);
     return {
       module: PublicAppModule,
       imports: [CoreModule.forRoot(env, logger), ProvidersModule.forRoot(env)],

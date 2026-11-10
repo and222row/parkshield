@@ -70,6 +70,14 @@ export function fakeProviders(env: Env) {
 }
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * Local dev, unit tests and the CI end-to-end run (a production build with fake providers, APP_ENV=ci):
+ * the only places where test helpers (dev mailbox, local push receiver) may exist. Real production
+ * never qualifies, and loadEnv refuses fakes there.
+ */
+export const isTestEnvironment = (env: Pick<Env, 'NODE_ENV' | 'APP_ENV'>) =>
+  env.NODE_ENV !== 'production' || env.APP_ENV === 'ci';
+
 function findRepoRoot(start: string): string | undefined {
   let dir = start;
   while (dir !== dirname(dir)) {

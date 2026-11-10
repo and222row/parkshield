@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { Global, Module, type DynamicModule } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import type { Logger } from 'pino';
-import { fakeProviders, repoRoot, type Env } from '../config/env';
+import { fakeProviders, isTestEnvironment, repoRoot, type Env } from '../config/env';
 import { LOGGER, VALKEY } from '../core/tokens';
 import { DevCaptcha, FriendlyCaptcha } from './captcha';
 import { FakePayments } from './fake-payments';
@@ -74,7 +74,7 @@ export class ProvidersModule {
               env.VAPID_SUBJECT,
               env.VAPID_PUBLIC_KEY,
               env.VAPID_PRIVATE_KEY,
-              env.NODE_ENV !== 'production',
+              isTestEnvironment(env),
             ),
         },
         {
