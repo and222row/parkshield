@@ -142,7 +142,7 @@ function Hero() {
             <Icon name="qr" className="size-4" />
             {t('landing.heroEyebrow')}
           </p>
-          <h1 className="animate-fade-up text-[2.15rem] font-extrabold leading-[1.08] tracking-tight text-balance hyphens-auto [animation-delay:80ms] sm:text-5xl lg:text-6xl">
+          <h1 className="animate-fade-up text-[2.15rem] font-extrabold leading-[1.08] tracking-tight text-balance hyphens-auto [animation-delay:80ms] sm:hyphens-none sm:text-5xl lg:text-6xl">
             {at < 0 ? (
               title
             ) : (

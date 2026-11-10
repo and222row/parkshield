@@ -30,3 +30,8 @@ infra/ansible/inventories/*/hosts.yml
 infra/monitoring/.terraform/
 infra/monitoring/*.tfstate*
 infra/monitoring/*.tfvars
+# Vercel CLI project link (local only)
+.vercel/
+
+.vercel
+.env*

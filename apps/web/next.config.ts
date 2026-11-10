@@ -15,7 +15,8 @@ const securityHeaders = [
 const config: NextConfig = {
   // A production build next to a running `next dev` must not share its folder (HMR hash mismatch loop).
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
-  output: 'standalone',
+  // Docker image on our own servers; Vercel (temporary website preview) builds its own output.
+  output: process.env.VERCEL ? undefined : 'standalone',
   outputFileTracingRoot: join(import.meta.dirname, '..', '..'),
   transpilePackages: ['@parkshield/ui'],
   poweredByHeader: false,
@@ -26,8 +27,11 @@ const config: NextConfig = {
     return [{ source: '/v1/:path*', destination: `${api}/v1/:path*` }];
   },
   async headers() {
+    // Previews (SITE_NOINDEX=1) stay out of search engines, e.g. while the Impressum has placeholders.
+    const robots =
+      process.env.SITE_NOINDEX === '1' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : [];
     return [
-      { source: '/:path*', headers: securityHeaders },
+      { source: '/:path*', headers: [...securityHeaders, ...robots] },
       // Browsers must pick up a new service worker at once (it only shows push notifications).
       { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
     ];
